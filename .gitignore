@@ -1,0 +1,12 @@
+.anchor
+.DS_Store
+target/*
+!target/idl/
+**/*.rs.bk
+node_modules
+test-ledger
+.yarn
+keypairs/
+.env.prod
+.env.local
+.claude/

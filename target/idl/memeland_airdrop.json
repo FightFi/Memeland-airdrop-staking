@@ -1,0 +1,464 @@
+{
+  "address": "Abp5pKfeUysdsxZULSDSRxkG2v66gLPn6c1Yu1Zuk9jT",
+  "metadata": {
+    "name": "memeland_airdrop",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Memeland $FIGHT Airdrop & 20-Day Exponential Staking Program"
+  },
+  "instructions": [
+    {
+      "name": "initialize_pool",
+      "discriminator": [
+        95,
+        180,
+        10,
+        172,
+        84,
+        174,
+        232,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool_state",
+          "writable": true
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "start_time",
+          "type": "i64"
+        },
+        {
+          "name": "merkle_root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "claim_airdrop",
+      "discriminator": [
+        137,
+        50,
+        122,
+        111,
+        89,
+        254,
+        8,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool_state",
+          "writable": true
+        },
+        {
+          "name": "user_stake",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "proof",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "snapshot",
+      "discriminator": [
+        144,
+        236,
+        6,
+        133,
+        233,
+        160,
+        21,
+        94
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "pool_state",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "unstake",
+      "discriminator": [
+        90,
+        95,
+        107,
+        42,
+        205,
+        124,
+        50,
+        225
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool_state",
+          "writable": true
+        },
+        {
+          "name": "user_stake",
+          "writable": true
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "terminate_pool",
+      "discriminator": [
+        148,
+        152,
+        145,
+        15,
+        142,
+        221,
+        5,
+        39
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "pool_state",
+          "writable": true
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "admin_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "calculate_rewards",
+      "discriminator": [
+        199,
+        115,
+        201,
+        124,
+        71,
+        81,
+        143,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "pool_state"
+        },
+        {
+          "name": "user_stake"
+        }
+      ],
+      "args": [
+        {
+          "name": "day",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "PoolState",
+      "discriminator": [
+        247,
+        237,
+        227,
+        245,
+        215,
+        195,
+        222,
+        70
+      ]
+    },
+    {
+      "name": "UserStake",
+      "discriminator": [
+        102,
+        53,
+        163,
+        107,
+        9,
+        138,
+        87,
+        153
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ProgramEnded",
+      "msg": "Program has ended"
+    },
+    {
+      "code": 6001,
+      "name": "AlreadyClaimed",
+      "msg": "Airdrop already claimed"
+    },
+    {
+      "code": 6002,
+      "name": "PermanentlyExited",
+      "msg": "User has permanently exited the program"
+    },
+    {
+      "code": 6003,
+      "name": "AirdropPoolExhausted",
+      "msg": "Airdrop pool exhausted"
+    },
+    {
+      "code": 6004,
+      "name": "NothingStaked",
+      "msg": "Nothing staked"
+    },
+    {
+      "code": 6005,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidMerkleProof",
+      "msg": "Invalid merkle proof"
+    },
+    {
+      "code": 6007,
+      "name": "PoolTerminated",
+      "msg": "Pool has been terminated"
+    },
+    {
+      "code": 6008,
+      "name": "AlreadyTerminated",
+      "msg": "Pool is already terminated"
+    },
+    {
+      "code": 6009,
+      "name": "AllSnapshotsTaken",
+      "msg": "All 20 snapshots have been taken"
+    },
+    {
+      "code": 6010,
+      "name": "SnapshotTooEarly",
+      "msg": "Snapshot too early - day not yet elapsed"
+    },
+    {
+      "code": 6011,
+      "name": "OutsideSnapshotWindow",
+      "msg": "Outside snapshot window (12:00-12:05 AM UTC)"
+    },
+    {
+      "code": 6012,
+      "name": "UnstakeBlockedDuringSnapshot",
+      "msg": "Unstaking blocked during snapshot window (12:00-12:05 AM UTC)"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidDay",
+      "msg": "Invalid day"
+    }
+  ],
+  "types": [
+    {
+      "name": "PoolState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "total_staked",
+            "type": "u64"
+          },
+          {
+            "name": "total_airdrop_claimed",
+            "type": "u64"
+          },
+          {
+            "name": "snapshot_count",
+            "type": "u8"
+          },
+          {
+            "name": "terminated",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "pool_token_bump",
+            "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "daily_rewards",
+            "type": {
+              "array": [
+                "u64",
+                32
+              ]
+            }
+          },
+          {
+            "name": "daily_snapshots",
+            "type": {
+              "array": [
+                "u64",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserStake",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "staked_amount",
+            "type": "u64"
+          },
+          {
+            "name": "claim_day",
+            "type": "u64"
+          },
+          {
+            "name": "has_claimed_airdrop",
+            "type": "bool"
+          },
+          {
+            "name": "has_unstaked",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
