@@ -15,16 +15,6 @@ pub const AIRDROP_POOL: u64 = 50_000_000_000_000;
 /// Staking rewards pool: 100_000_000 tokens × 10^6
 pub const STAKING_POOL: u64 = 100_000_000_000_000;
 
-/// k ≈ 0.05 for exponential curve, stored as fixed-point
-pub const K_FIXED: u128 = 500_000_000;
-pub const K_SCALE: u128 = 10_000_000_000;
-
-/// Precision for exponential computation
-pub const EXP_PRECISION: u128 = 1_000_000_000_000;
-
-/// Precision for reward share calculation (avoid truncation)
-pub const REWARD_PRECISION: u128 = 1_000_000_000_000;
-
 /// Snapshot window: 5 minutes (300 seconds) after midnight UTC
 pub const SNAPSHOT_WINDOW_SECS: i64 = 300;
 
@@ -43,6 +33,7 @@ pub mod memeland_airdrop {
         ctx: Context<InitializePool>,
         start_time: i64,
         merkle_root: [u8; 32],
+        daily_rewards: [u64; 20],
     ) -> Result<()> {
         let pool = &mut ctx.accounts.pool_state.load_init()?;
         pool.admin = ctx.accounts.admin.key();
@@ -57,23 +48,16 @@ pub mod memeland_airdrop {
         pool.bump = ctx.bumps.pool_state;
         pool.pool_token_bump = ctx.bumps.pool_token_account;
 
-        // Pre-compute daily reward amounts using exponential curve
-        let mut exp_values = [0u128; 20];
-        let mut total_exp_sum: u128 = 0;
-        for d in 0..20u32 {
-            exp_values[d as usize] = exp_fixed(K_FIXED, d as u128, K_SCALE, EXP_PRECISION);
-            total_exp_sum += exp_values[d as usize];
-        }
-
+        // Validate that the supplied daily rewards sum to exactly STAKING_POOL
+        let mut sum: u64 = 0;
         for d in 0..20usize {
-            pool.daily_rewards[d] = ((STAKING_POOL as u128)
-                .checked_mul(exp_values[d])
-                .unwrap()
-                / total_exp_sum) as u64;
+            sum = sum.checked_add(daily_rewards[d]).unwrap();
+            pool.daily_rewards[d] = daily_rewards[d];
         }
+        require!(sum == STAKING_POOL, ErrorCode::InvalidDailyRewards);
 
         msg!(
-            "Pool initialized. Start: {}, merkle root set, {} daily rewards computed",
+            "Pool initialized. Start: {}, merkle root set, {} daily rewards validated",
             pool.start_time,
             TOTAL_DAYS
         );
@@ -90,6 +74,13 @@ pub mod memeland_airdrop {
         let clock = Clock::get()?;
 
         require!(pool.terminated == 0, ErrorCode::PoolTerminated);
+
+        // Block claims during snapshot window to prevent total_staked manipulation
+        let seconds_into_day = clock.unix_timestamp.rem_euclid(SECONDS_PER_DAY as i64);
+        require!(
+            seconds_into_day >= SNAPSHOT_WINDOW_SECS,
+            ErrorCode::ClaimBlockedDuringSnapshot
+        );
 
         let user_stake = &mut ctx.accounts.user_stake;
         require!(!user_stake.has_claimed_airdrop, ErrorCode::AlreadyClaimed);
@@ -317,10 +308,7 @@ pub mod memeland_airdrop {
             let user_share = (user_stake.staked_amount as u128)
                 .checked_mul(daily)
                 .unwrap()
-                .checked_mul(REWARD_PRECISION)
-                .unwrap()
-                / (snapshot_total as u128)
-                / REWARD_PRECISION;
+                / (snapshot_total as u128);
             user_share as u64
         } else {
             0
@@ -332,21 +320,6 @@ pub mod memeland_airdrop {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-/// Fixed-point exponential: e^(k * d) using Taylor series (20 terms).
-pub fn exp_fixed(k: u128, d: u128, k_scale: u128, precision: u128) -> u128 {
-    let x_num = k.checked_mul(d).unwrap();
-    let mut result: u128 = precision;
-    let mut term: u128 = precision;
-    for n in 1u128..=20 {
-        term = term.checked_mul(x_num).unwrap() / (k_scale.checked_mul(n).unwrap());
-        result = result.checked_add(term).unwrap();
-        if term == 0 {
-            break;
-        }
-    }
-    result
-}
 
 pub fn get_current_day(start_time: i64, now: i64) -> u64 {
     if now <= start_time {
@@ -605,4 +578,8 @@ pub enum ErrorCode {
     UnstakeBlockedDuringSnapshot,
     #[msg("Invalid day")]
     InvalidDay,
+    #[msg("Claims blocked during snapshot window (12:00-12:05 AM UTC)")]
+    ClaimBlockedDuringSnapshot,
+    #[msg("Daily rewards must sum to exactly STAKING_POOL")]
+    InvalidDailyRewards,
 }

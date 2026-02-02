@@ -29,9 +29,6 @@ import {
   Connection,
   Keypair,
   PublicKey,
-  ComputeBudgetProgram,
-  Transaction,
-  sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import {
   getOrCreateAssociatedTokenAccount,
@@ -53,6 +50,24 @@ function requireEnv(name: string): string {
 }
 
 const TOTAL_SUPPLY = BigInt(150_000_000_000_000); // 150M with 6 decimals
+const STAKING_POOL = new BN("100000000000000"); // 100M with 6 decimals
+
+function computeDailyRewards(): BN[] {
+  const K = 0.05;
+  const expValues = Array.from({ length: 20 }, (_, d) => Math.exp(K * d));
+  const totalExp = expValues.reduce((a, b) => a + b, 0);
+
+  const rewards = expValues.map(
+    (v) => new BN(Math.floor((Number(STAKING_POOL.toString()) * v) / totalExp))
+  );
+
+  // Adjust last element so sum is exactly STAKING_POOL
+  const currentSum = rewards.reduce((a, b) => a.add(b), new BN(0));
+  const diff = STAKING_POOL.sub(currentSum);
+  rewards[19] = rewards[19].add(diff);
+
+  return rewards;
+}
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
@@ -153,17 +168,17 @@ async function main() {
 
   console.log("\n--- Step 1: Initialize Pool ---");
 
+  const dailyRewards = computeDailyRewards();
+  console.log(`Daily rewards computed off-chain (${dailyRewards.length} days)`);
+
   const tx = await program.methods
-    .initializePool(new BN(startTime), merkleRoot)
+    .initializePool(new BN(startTime), merkleRoot, dailyRewards)
     .accounts({
       admin: admin.publicKey,
       poolState,
       tokenMint,
       poolTokenAccount,
     })
-    .preInstructions([
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-    ])
     .rpc();
 
   console.log(`initialize_pool tx: ${tx}`);

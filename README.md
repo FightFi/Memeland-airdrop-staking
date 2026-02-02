@@ -214,6 +214,9 @@ This starts a local Solana validator, deploys the program, and runs all 22 tests
 To rebuild and test:
 
 ```bash
+source ~/.nvm/nvm.sh && nvm use 20 && PATH="$HOME/.cargo/bin:$PATH" anchor test --skip-build
+```
+```bash
 anchor build --no-idl && anchor test --skip-build
 ```
 

@@ -5,7 +5,6 @@ import {
   Keypair,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
-  ComputeBudgetProgram,
 } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
@@ -77,6 +76,25 @@ function getMerkleProof(layers: Buffer[][], leaf: Buffer): Buffer[] {
     idx = Math.floor(idx / 2);
   }
   return proof;
+}
+
+// ── Off-chain reward computation ─────────────────────────────────────────────
+
+function computeDailyRewards(): BN[] {
+  const K = 0.05;
+  const expValues = Array.from({ length: 20 }, (_, d) => Math.exp(K * d));
+  const totalExp = expValues.reduce((a, b) => a + b, 0);
+
+  const rewards = expValues.map(
+    (v) => new BN(Math.floor((Number(STAKING_POOL.toString()) * v) / totalExp))
+  );
+
+  // Adjust last element so sum is exactly STAKING_POOL
+  const currentSum = rewards.reduce((a, b) => a.add(b), new BN(0));
+  const diff = STAKING_POOL.sub(currentSum);
+  rewards[19] = rewards[19].add(diff);
+
+  return rewards;
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
@@ -194,8 +212,23 @@ describe("memeland_airdrop", () => {
       const now = Math.floor(Date.now() / 1000);
       startTime = Math.floor(now / SECONDS_PER_DAY) * SECONDS_PER_DAY - 2 * SECONDS_PER_DAY;
 
+      const dailyRewards = computeDailyRewards();
+
+      console.log("\n      Daily Rewards (tokens with 6 decimals):");
+      dailyRewards.forEach((r, i) => {
+        const tokens = Number(r.toString()) / 1e6;
+        console.log(`        Day ${String(i + 1).padStart(2)}: ${tokens.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} tokens  (raw: ${r.toString()})`);
+      });
+      const sum = dailyRewards.reduce((a, b) => a.add(b), new BN(0));
+      console.log(`        ────────────────────────────────`);
+      console.log(`        Total: ${(Number(sum.toString()) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2 })} tokens\n`);
+
       await program.methods
-        .initializePool(new BN(startTime), Array.from(merkleRoot))
+        .initializePool(
+          new BN(startTime),
+          Array.from(merkleRoot),
+          dailyRewards
+        )
         .accounts({
           admin: admin.publicKey,
           poolState: poolStatePda,
@@ -205,9 +238,6 @@ describe("memeland_airdrop", () => {
           tokenProgram: TOKEN_PROGRAM_ID,
           rent: SYSVAR_RENT_PUBKEY,
         })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-        ])
         .rpc();
 
       const poolAccount = await provider.connection.getAccountInfo(poolStatePda);
@@ -226,11 +256,7 @@ describe("memeland_airdrop", () => {
       }
 
       const stakingPoolBig = BigInt(STAKING_POOL.toString());
-      const diff =
-        totalDailyRewards > stakingPoolBig
-          ? totalDailyRewards - stakingPoolBig
-          : stakingPoolBig - totalDailyRewards;
-      expect(Number(diff)).to.be.lessThan(Number(stakingPoolBig) * 0.01);
+      expect(totalDailyRewards).to.equal(stakingPoolBig);
     });
 
     it("rewards are monotonically increasing", async () => {
@@ -617,7 +643,7 @@ describe("memeland_airdrop", () => {
       const st = Math.floor(now / SECONDS_PER_DAY) * SECONDS_PER_DAY - SECONDS_PER_DAY;
 
       await program.methods
-        .initializePool(new BN(st), Array.from(merkleRoot))
+        .initializePool(new BN(st), Array.from(merkleRoot), computeDailyRewards())
         .accounts({
           admin: admin.publicKey,
           poolState: poolState2,
@@ -627,9 +653,6 @@ describe("memeland_airdrop", () => {
           tokenProgram: TOKEN_PROGRAM_ID,
           rent: SYSVAR_RENT_PUBKEY,
         })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-        ])
         .rpc();
 
       // Fund pool
@@ -778,7 +801,7 @@ describe("memeland_airdrop", () => {
         3 * SECONDS_PER_DAY;
 
       await program.methods
-        .initializePool(new BN(st), Array.from(tree3Root))
+        .initializePool(new BN(st), Array.from(tree3Root), computeDailyRewards())
         .accounts({
           admin: admin.publicKey,
           poolState: poolState3,
@@ -788,9 +811,6 @@ describe("memeland_airdrop", () => {
           tokenProgram: TOKEN_PROGRAM_ID,
           rent: SYSVAR_RENT_PUBKEY,
         })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-        ])
         .rpc();
 
       // Fund

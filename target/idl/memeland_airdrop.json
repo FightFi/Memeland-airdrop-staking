@@ -62,6 +62,15 @@
               32
             ]
           }
+        },
+        {
+          "name": "daily_rewards",
+          "type": {
+            "array": [
+              "u64",
+              20
+            ]
+          }
         }
       ]
     },
@@ -341,6 +350,16 @@
       "code": 6013,
       "name": "InvalidDay",
       "msg": "Invalid day"
+    },
+    {
+      "code": 6014,
+      "name": "ClaimBlockedDuringSnapshot",
+      "msg": "Claims blocked during snapshot window (12:00-12:05 AM UTC)"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidDailyRewards",
+      "msg": "Daily rewards must sum to exactly STAKING_POOL"
     }
   ],
   "types": [
