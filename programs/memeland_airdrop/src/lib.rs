@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
 
 declare_id!("Abp5pKfeUysdsxZULSDSRxkG2v66gLPn6c1Yu1Zuk9jT");
 
@@ -9,14 +9,16 @@ declare_id!("Abp5pKfeUysdsxZULSDSRxkG2v66gLPn6c1Yu1Zuk9jT");
 pub const TOTAL_DAYS: u64 = 20;
 pub const SECONDS_PER_DAY: u64 = 86400;
 
-/// Airdrop pool: 50_000_000 tokens × 10^6 (6 decimals)
-pub const AIRDROP_POOL: u64 = 50_000_000_000_000;
+/// Airdrop pool: 50_000_000 tokens × 10^9 (9 decimals)
+pub const AIRDROP_POOL: u64 = 50_000_000_000_000_000;
 
-/// Staking rewards pool: 100_000_000 tokens × 10^6
-pub const STAKING_POOL: u64 = 100_000_000_000_000;
+/// Staking rewards pool: 100_000_000 tokens × 10^9
+pub const STAKING_POOL: u64 = 100_000_000_000_000_000;
 
-/// Snapshot window: 5 minutes (300 seconds) after midnight UTC
-pub const SNAPSHOT_WINDOW_SECS: i64 = 300;
+/// Snapshot window: 5 minutes starting at noon UTC
+pub const SNAPSHOT_START: i64 = 12 * 60 * 60; // 12:00 PM UTC (noon) = 43200 seconds
+pub const SNAPSHOT_WINDOW_SECS: i64 = 5 * 60; // 5 minutes
+
 
 // PoolState size for zero_copy:
 // 32 + 32 + 32 + 32 + 8 + 8 + 8 + 1 + 1 + 1 + 1 + 4 + (32*8) + (32*8) = 672
@@ -65,6 +67,7 @@ pub mod memeland_airdrop {
     }
 
     /// Claim airdrop via merkle proof. Tokens are auto-staked.
+    /// Creates a permanent ClaimMarker (prevents re-claims) and a UserStake (closed on unstake).
     pub fn claim_airdrop(
         ctx: Context<ClaimAirdrop>,
         amount: u64,
@@ -78,13 +81,10 @@ pub mod memeland_airdrop {
         // Block claims during snapshot window to prevent total_staked manipulation
         let seconds_into_day = clock.unix_timestamp.rem_euclid(SECONDS_PER_DAY as i64);
         require!(
-            seconds_into_day >= SNAPSHOT_WINDOW_SECS,
+            seconds_into_day < SNAPSHOT_START ||
+            seconds_into_day >= SNAPSHOT_START + SNAPSHOT_WINDOW_SECS,
             ErrorCode::ClaimBlockedDuringSnapshot
         );
-
-        let user_stake = &mut ctx.accounts.user_stake;
-        require!(!user_stake.has_claimed_airdrop, ErrorCode::AlreadyClaimed);
-        require!(!user_stake.has_unstaked, ErrorCode::PermanentlyExited);
 
         // Verify merkle proof
         let leaf = keccak::hashv(&[
@@ -99,11 +99,15 @@ pub mod memeland_airdrop {
         // Determine which day the user is claiming on
         let claim_day = get_current_day(pool.start_time, clock.unix_timestamp);
 
+        // Initialize claim marker (prevents re-claiming after unstake)
+        let claim_marker = &mut ctx.accounts.claim_marker;
+        claim_marker.bump = ctx.bumps.claim_marker;
+
+        // Initialize user stake
+        let user_stake = &mut ctx.accounts.user_stake;
         user_stake.owner = ctx.accounts.user.key();
-        user_stake.has_claimed_airdrop = true;
         user_stake.staked_amount = amount;
         user_stake.claim_day = claim_day;
-        user_stake.has_unstaked = false;
         user_stake.bump = ctx.bumps.user_stake;
 
         pool.total_staked = pool.total_staked.checked_add(amount).unwrap();
@@ -144,11 +148,12 @@ pub mod memeland_airdrop {
             ErrorCode::SnapshotTooEarly
         );
 
-        // Verify we are within the 12:00-12:05 AM UTC window
+        // Verify we are within the window
         let seconds_into_day = clock.unix_timestamp.rem_euclid(SECONDS_PER_DAY as i64);
         require!(
-            seconds_into_day < SNAPSHOT_WINDOW_SECS,
-            ErrorCode::OutsideSnapshotWindow
+            seconds_into_day < SNAPSHOT_START ||
+            seconds_into_day >= SNAPSHOT_START + SNAPSHOT_WINDOW_SECS,
+            ErrorCode::ClaimBlockedDuringSnapshot
         );
 
         // Record snapshot
@@ -166,19 +171,20 @@ pub mod memeland_airdrop {
 
     /// Unstake: permanent exit. Sends principal + all accumulated rewards.
     /// Cannot be called during snapshot window (12:00-12:05 AM UTC).
+    /// Closes the UserStake account and returns rent to user.
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
         let pool = &mut ctx.accounts.pool_state.load_mut()?;
-        let user_stake = &mut ctx.accounts.user_stake;
+        let user_stake = &ctx.accounts.user_stake;
         let clock = Clock::get()?;
 
-        require!(!user_stake.has_unstaked, ErrorCode::PermanentlyExited);
         require!(user_stake.staked_amount > 0, ErrorCode::NothingStaked);
 
         // Block unstaking during snapshot window
         let seconds_into_day = clock.unix_timestamp.rem_euclid(SECONDS_PER_DAY as i64);
         require!(
-            seconds_into_day >= SNAPSHOT_WINDOW_SECS,
-            ErrorCode::UnstakeBlockedDuringSnapshot
+            seconds_into_day < SNAPSHOT_START ||
+            seconds_into_day >= SNAPSHOT_START + SNAPSHOT_WINDOW_SECS,
+            ErrorCode::ClaimBlockedDuringSnapshot
         );
 
         // Calculate accumulated rewards
@@ -215,14 +221,11 @@ pub mod memeland_airdrop {
         );
         token::transfer(transfer_ctx, total_payout)?;
 
-        // Update state
+        // Update pool state (UserStake account is closed by Anchor's close constraint)
         pool.total_staked = pool.total_staked.checked_sub(user_stake.staked_amount).unwrap();
 
-        user_stake.has_unstaked = true;
-        user_stake.staked_amount = 0;
-
         msg!(
-            "Unstaked: {} principal + {} rewards = {} total sent to {}",
+            "Unstaked: {} principal + {} rewards = {} total sent to {}. UserStake account closed.",
             total_payout - rewards,
             rewards,
             total_payout,
@@ -273,6 +276,7 @@ pub mod memeland_airdrop {
     /// View function: calculate potential rewards for a user on a given day.
     /// For past days with snapshots, uses actual values.
     /// For future days, uses the last snapshot's total_staked.
+    /// Note: After unstake, UserStake is closed so this instruction will fail (account not found).
     pub fn calculate_rewards(ctx: Context<CalculateRewards>, day: u64) -> Result<()> {
         let pool = &ctx.accounts.pool_state.load()?;
         let user_stake = &ctx.accounts.user_stake;
@@ -281,11 +285,6 @@ pub mod memeland_airdrop {
 
         if day < user_stake.claim_day {
             msg!("Day {} reward: 0 (before claim)", day);
-            return Ok(());
-        }
-
-        if user_stake.has_unstaked {
-            msg!("Day {} reward: 0 (user has unstaked)", day);
             return Ok(());
         }
 
@@ -315,6 +314,55 @@ pub mod memeland_airdrop {
         };
 
         msg!("Day {} reward: {}", day, reward);
+        Ok(())
+    }
+
+    /// Close pool state and token accounts, return rent to admin.
+    /// Only allowed after pool is terminated AND all users have unstaked.
+    pub fn close_pool(ctx: Context<ClosePool>) -> Result<()> {
+        let pool = ctx.accounts.pool_state.load()?;
+
+        require!(pool.terminated == 1, ErrorCode::PoolNotTerminated);
+        require!(pool.total_staked == 0, ErrorCode::PoolNotEmpty);
+
+        let pool_token_bump = pool.pool_token_bump;
+        drop(pool); // Release borrow before closing
+
+        // Close the pool token account (SPL close_account CPI)
+        let pool_state_key = ctx.accounts.pool_state.key();
+        let seeds = &[
+            b"pool_token",
+            pool_state_key.as_ref(),
+            &[pool_token_bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
+
+        let close_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.pool_token_account.to_account_info(),
+                destination: ctx.accounts.admin.to_account_info(),
+                authority: ctx.accounts.pool_token_account.to_account_info(),
+            },
+            signer_seeds,
+        );
+        token::close_account(close_ctx)?;
+
+        // Close pool_state (zero_copy account - manual lamport transfer)
+        let pool_state_info = ctx.accounts.pool_state.to_account_info();
+        let admin_info = ctx.accounts.admin.to_account_info();
+
+        let pool_lamports = pool_state_info.lamports();
+        **pool_state_info.try_borrow_mut_lamports()? = 0;
+        **admin_info.try_borrow_mut_lamports()? = admin_info
+            .lamports()
+            .checked_add(pool_lamports)
+            .unwrap();
+
+        msg!(
+            "Pool closed. Rent returned to admin: {} lamports from pool_state + token account rent.",
+            pool_lamports
+        );
         Ok(())
     }
 }
@@ -421,8 +469,19 @@ pub struct ClaimAirdrop<'info> {
     #[account(mut)]
     pub pool_state: AccountLoader<'info, PoolState>,
 
+    /// Permanent marker that prevents re-claiming (tiny, ~0.001 SOL)
     #[account(
-        init_if_needed,
+        init,
+        payer = user,
+        space = 8 + ClaimMarker::INIT_SPACE,
+        seeds = [b"claimed", pool_state.key().as_ref(), user.key().as_ref()],
+        bump,
+    )]
+    pub claim_marker: Account<'info, ClaimMarker>,
+
+    /// Stake data, closed on unstake (user recovers rent)
+    #[account(
+        init,
         payer = user,
         space = 8 + UserStake::INIT_SPACE,
         seeds = [b"user_stake", pool_state.key().as_ref(), user.key().as_ref()],
@@ -457,6 +516,7 @@ pub struct Unstake<'info> {
         seeds = [b"user_stake", pool_state.key().as_ref(), user.key().as_ref()],
         bump = user_stake.bump,
         constraint = user_stake.owner == user.key() @ ErrorCode::Unauthorized,
+        close = user,  // Return rent to user
     )]
     pub user_stake: Account<'info, UserStake>,
 
@@ -513,6 +573,26 @@ pub struct CalculateRewards<'info> {
     pub user_stake: Account<'info, UserStake>,
 }
 
+#[derive(Accounts)]
+pub struct ClosePool<'info> {
+    #[account(
+        mut,
+        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::Unauthorized,
+    )]
+    pub admin: Signer<'info>,
+
+    #[account(mut)]
+    pub pool_state: AccountLoader<'info, PoolState>,
+
+    #[account(
+        mut,
+        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::Unauthorized,
+    )]
+    pub pool_token_account: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+}
+
 // ── State ──────────────────────────────────────────────────────────────────────
 
 /// Pool state using zero_copy to avoid stack overflow.
@@ -535,15 +615,22 @@ pub struct PoolState {
     pub daily_snapshots: [u64; 32],       // 256 (only 0..20 used)
 }                                         // Total: 688
 
+/// Permanent marker that prevents re-claiming after unstake.
+/// Tiny account (~0.001 SOL rent) that stays forever.
+#[account]
+#[derive(InitSpace)]
+pub struct ClaimMarker {
+    pub bump: u8,  // 1
+}
+
+/// User stake data. Created on claim, closed on unstake (rent returned).
 #[account]
 #[derive(InitSpace)]
 pub struct UserStake {
-    pub owner: Pubkey,              // 32
-    pub staked_amount: u64,         // 8
-    pub claim_day: u64,             // 8
-    pub has_claimed_airdrop: bool,  // 1
-    pub has_unstaked: bool,         // 1
-    pub bump: u8,                   // 1
+    pub owner: Pubkey,       // 32
+    pub staked_amount: u64,  // 8
+    pub claim_day: u64,      // 8
+    pub bump: u8,            // 1
 }
 
 // ── Errors ─────────────────────────────────────────────────────────────────────
@@ -552,10 +639,6 @@ pub struct UserStake {
 pub enum ErrorCode {
     #[msg("Program has ended")]
     ProgramEnded,
-    #[msg("Airdrop already claimed")]
-    AlreadyClaimed,
-    #[msg("User has permanently exited the program")]
-    PermanentlyExited,
     #[msg("Airdrop pool exhausted")]
     AirdropPoolExhausted,
     #[msg("Nothing staked")]
@@ -582,4 +665,8 @@ pub enum ErrorCode {
     ClaimBlockedDuringSnapshot,
     #[msg("Daily rewards must sum to exactly STAKING_POOL")]
     InvalidDailyRewards,
+    #[msg("Pool must be terminated before closing")]
+    PoolNotTerminated,
+    #[msg("Pool still has staked funds - all users must unstake first")]
+    PoolNotEmpty,
 }

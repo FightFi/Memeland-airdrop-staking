@@ -93,7 +93,7 @@ async function main() {
 
   // Read total_staked
   const totalStaked = poolAccount.data.readBigUInt64LE(144); // offset of total_staked
-  console.log(`Current total_staked: ${Number(totalStaked) / 1e6} tokens`);
+  console.log(`Current total_staked: ${Number(totalStaked) / 1e9} tokens`);
 
   // Call snapshot
   console.log("\nCalling snapshot()...");

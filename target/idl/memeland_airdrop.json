@@ -97,6 +97,10 @@
           "writable": true
         },
         {
+          "name": "claim_marker",
+          "writable": true
+        },
+        {
           "name": "user_stake",
           "writable": true
         },
@@ -250,9 +254,55 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "close_pool",
+      "discriminator": [
+        140,
+        189,
+        209,
+        23,
+        239,
+        62,
+        239,
+        11
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool_state",
+          "writable": true
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
+    {
+      "name": "ClaimMarker",
+      "discriminator": [
+        112,
+        19,
+        68,
+        142,
+        48,
+        200,
+        150,
+        116
+      ]
+    },
     {
       "name": "PoolState",
       "discriminator": [
@@ -288,81 +338,93 @@
     },
     {
       "code": 6001,
-      "name": "AlreadyClaimed",
-      "msg": "Airdrop already claimed"
-    },
-    {
-      "code": 6002,
-      "name": "PermanentlyExited",
-      "msg": "User has permanently exited the program"
-    },
-    {
-      "code": 6003,
       "name": "AirdropPoolExhausted",
       "msg": "Airdrop pool exhausted"
     },
     {
-      "code": 6004,
+      "code": 6002,
       "name": "NothingStaked",
       "msg": "Nothing staked"
     },
     {
-      "code": 6005,
+      "code": 6003,
       "name": "Unauthorized",
       "msg": "Unauthorized"
     },
     {
-      "code": 6006,
+      "code": 6004,
       "name": "InvalidMerkleProof",
       "msg": "Invalid merkle proof"
     },
     {
-      "code": 6007,
+      "code": 6005,
       "name": "PoolTerminated",
       "msg": "Pool has been terminated"
     },
     {
-      "code": 6008,
+      "code": 6006,
       "name": "AlreadyTerminated",
       "msg": "Pool is already terminated"
     },
     {
-      "code": 6009,
+      "code": 6007,
       "name": "AllSnapshotsTaken",
       "msg": "All 20 snapshots have been taken"
     },
     {
-      "code": 6010,
+      "code": 6008,
       "name": "SnapshotTooEarly",
       "msg": "Snapshot too early - day not yet elapsed"
     },
     {
-      "code": 6011,
+      "code": 6009,
       "name": "OutsideSnapshotWindow",
       "msg": "Outside snapshot window (12:00-12:05 AM UTC)"
     },
     {
-      "code": 6012,
+      "code": 6010,
       "name": "UnstakeBlockedDuringSnapshot",
       "msg": "Unstaking blocked during snapshot window (12:00-12:05 AM UTC)"
     },
     {
-      "code": 6013,
+      "code": 6011,
       "name": "InvalidDay",
       "msg": "Invalid day"
     },
     {
-      "code": 6014,
+      "code": 6012,
       "name": "ClaimBlockedDuringSnapshot",
       "msg": "Claims blocked during snapshot window (12:00-12:05 AM UTC)"
     },
     {
-      "code": 6015,
+      "code": 6013,
       "name": "InvalidDailyRewards",
       "msg": "Daily rewards must sum to exactly STAKING_POOL"
+    },
+    {
+      "code": 6014,
+      "name": "PoolNotTerminated",
+      "msg": "Pool must be terminated before closing"
+    },
+    {
+      "code": 6015,
+      "name": "PoolNotEmpty",
+      "msg": "Pool still has staked funds - all users must unstake first"
     }
   ],
   "types": [
+    {
+      "name": "ClaimMarker",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
     {
       "name": "PoolState",
       "type": {
@@ -463,14 +525,6 @@
           {
             "name": "claim_day",
             "type": "u64"
-          },
-          {
-            "name": "has_claimed_airdrop",
-            "type": "bool"
-          },
-          {
-            "name": "has_unstaked",
-            "type": "bool"
           },
           {
             "name": "bump",

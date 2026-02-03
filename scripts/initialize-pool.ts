@@ -49,16 +49,26 @@ function requireEnv(name: string): string {
   return val;
 }
 
-const TOTAL_SUPPLY = BigInt(150_000_000_000_000); // 150M with 6 decimals
-const STAKING_POOL = new BN("100000000000000"); // 100M with 6 decimals
+const TOKEN_DECIMALS = 9;
+const TOTAL_SUPPLY = BigInt("150000000000000000"); // 150M with 9 decimals
+const STAKING_POOL = new BN("100000000000000000"); // 100M with 9 decimals
 
 function computeDailyRewards(): BN[] {
   const K = 0.05;
+  const SCALE = 1e15; // Scale factor for precision in BigInt math
+
   const expValues = Array.from({ length: 20 }, (_, d) => Math.exp(K * d));
   const totalExp = expValues.reduce((a, b) => a + b, 0);
 
-  const rewards = expValues.map(
-    (v) => new BN(Math.floor((Number(STAKING_POOL.toString()) * v) / totalExp))
+  // Calculate scaled proportions (convert to integers for BigInt math)
+  const scaledProportions = expValues.map(v => BigInt(Math.round((v / totalExp) * SCALE)));
+  const totalScaled = scaledProportions.reduce((a, b) => a + b, 0n);
+
+  const stakingPool = BigInt(STAKING_POOL.toString());
+
+  // Calculate rewards: stakingPool * proportion / totalScaled
+  const rewards = scaledProportions.map(p =>
+    new BN((stakingPool * p / totalScaled).toString())
   );
 
   // Adjust last element so sum is exactly STAKING_POOL
@@ -204,11 +214,11 @@ async function main() {
   );
 
   const adminBalance = adminAta.amount;
-  console.log(`Admin token balance: ${Number(adminBalance) / 1e6} tokens`);
+  console.log(`Admin token balance: ${Number(adminBalance) / 1e9} tokens`);
 
   if (adminBalance < TOTAL_SUPPLY) {
     console.error(
-      `Insufficient token balance. Need ${Number(TOTAL_SUPPLY) / 1e6}, have ${Number(adminBalance) / 1e6}`
+      `Insufficient token balance. Need ${Number(TOTAL_SUPPLY) / 1e9}, have ${Number(adminBalance) / 1e9}`
     );
     process.exit(1);
   }
@@ -226,7 +236,7 @@ async function main() {
   // Verify pool balance
   const poolTokenInfo = await getAccount(connection, poolTokenAccount);
   console.log(
-    `Pool token balance: ${Number(poolTokenInfo.amount) / 1e6} tokens`
+    `Pool token balance: ${Number(poolTokenInfo.amount) / 1e9} tokens`
   );
 
   // ── Done ──────────────────────────────────────────────────────────────────
@@ -236,7 +246,7 @@ async function main() {
   console.log(`Pool Token Account: ${poolTokenAccount.toBase58()}`);
   console.log(`Token Mint:         ${tokenMint.toBase58()}`);
   console.log(`Start Time:         ${startDate.toUTCString()}`);
-  console.log(`Total Funded:       ${Number(TOTAL_SUPPLY) / 1e6} $FIGHT`);
+  console.log(`Total Funded:       ${Number(TOTAL_SUPPLY) / 1e9} $FIGHT`);
   console.log(`\nUsers can now claim airdrops using their merkle proofs.`);
   console.log(`Admin must call snapshot() daily at 12:00-12:05 AM UTC.`);
 }

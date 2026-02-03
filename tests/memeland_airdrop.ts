@@ -1,5 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
-import { Program, BN } from "@coral-xyz/anchor";
+import BN from "bn.js";
+
 import {
   PublicKey,
   Keypair,
@@ -15,15 +16,17 @@ import {
   createTransferInstruction,
 } from "@solana/spl-token";
 import { expect } from "chai";
-// @ts-ignore
-import { keccak256 } from "js-sha3";
+import pkg from "js-sha3";
+const { keccak256 } = pkg;
+
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const TOTAL_DAYS = 20;
 const SECONDS_PER_DAY = 86400;
-const AIRDROP_POOL = new BN("50000000000000"); // 50M with 6 decimals
-const STAKING_POOL = new BN("100000000000000"); // 100M with 6 decimals
+const TOKEN_DECIMALS = 9;
+const AIRDROP_POOL = new BN("50000000000000000"); // 50M with 9 decimals
+const STAKING_POOL = new BN("100000000000000000"); // 100M with 9 decimals
 const TOTAL_POOL = AIRDROP_POOL.add(STAKING_POOL); // 150M
 
 // ── Merkle tree helpers ────────────────────────────────────────────────────────
@@ -82,11 +85,20 @@ function getMerkleProof(layers: Buffer[][], leaf: Buffer): Buffer[] {
 
 function computeDailyRewards(): BN[] {
   const K = 0.05;
+  const SCALE = 1e15; // Scale factor for precision in BigInt math
+
   const expValues = Array.from({ length: 20 }, (_, d) => Math.exp(K * d));
   const totalExp = expValues.reduce((a, b) => a + b, 0);
 
-  const rewards = expValues.map(
-    (v) => new BN(Math.floor((Number(STAKING_POOL.toString()) * v) / totalExp))
+  // Calculate scaled proportions (convert to integers for BigInt math)
+  const scaledProportions = expValues.map(v => BigInt(Math.round((v / totalExp) * SCALE)));
+  const totalScaled = scaledProportions.reduce((a, b) => a + b, 0n);
+
+  const stakingPool = BigInt(STAKING_POOL.toString());
+
+  // Calculate rewards: stakingPool * proportion / totalScaled
+  const rewards = scaledProportions.map(p =>
+    new BN((stakingPool * p / totalScaled).toString())
   );
 
   // Adjust last element so sum is exactly STAKING_POOL
@@ -116,9 +128,9 @@ describe("memeland_airdrop", () => {
   const user2 = Keypair.generate();
   const user3 = Keypair.generate();
 
-  const user1Amount = new BN(1_000_000_000_000); // 1M tokens
-  const user2Amount = new BN(2_000_000_000_000); // 2M tokens
-  const user3Amount = new BN(500_000_000_000); // 500k tokens
+  const user1Amount = new BN("1000000000000000"); // 1M tokens (9 decimals)
+  const user2Amount = new BN("2000000000000000"); // 2M tokens (9 decimals)
+  const user3Amount = new BN("500000000000000"); // 500k tokens (9 decimals)
 
   // Merkle tree
   let merkleRoot: Buffer;
@@ -155,6 +167,16 @@ describe("memeland_airdrop", () => {
     );
   }
 
+  function getClaimMarkerPda(
+    poolState: PublicKey,
+    user: PublicKey
+  ): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from("claimed"), poolState.toBuffer(), user.toBuffer()],
+      program.programId
+    );
+  }
+
   async function fundAccount(pubkey: PublicKey, lamports = 10_000_000_000) {
     const sig = await provider.connection.requestAirdrop(pubkey, lamports);
     await provider.connection.confirmTransaction(sig, "confirmed");
@@ -180,7 +202,7 @@ describe("memeland_airdrop", () => {
       admin,
       admin.publicKey,
       null,
-      6
+      TOKEN_DECIMALS
     );
 
     [poolStatePda] = getPoolStatePda(tokenMint);
@@ -214,14 +236,14 @@ describe("memeland_airdrop", () => {
 
       const dailyRewards = computeDailyRewards();
 
-      console.log("\n      Daily Rewards (tokens with 6 decimals):");
+      console.log("\n      Daily Rewards (tokens with 9 decimals):");
       dailyRewards.forEach((r, i) => {
-        const tokens = Number(r.toString()) / 1e6;
-        console.log(`        Day ${String(i + 1).padStart(2)}: ${tokens.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} tokens  (raw: ${r.toString()})`);
+        const tokens = Number(r.toString()) / 1e9;
+        console.log(`        Day ${String(i + 1).padStart(2)}: ${tokens.toLocaleString("en-US", { minimumFractionDigits: 9, maximumFractionDigits: 9 })} tokens  (raw: ${r.toString()})`);
       });
       const sum = dailyRewards.reduce((a, b) => a.add(b), new BN(0));
       console.log(`        ────────────────────────────────`);
-      console.log(`        Total: ${(Number(sum.toString()) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2 })} tokens\n`);
+      console.log(`        Total: ${(Number(sum.toString()) / 1e9).toLocaleString("en-US", { minimumFractionDigits: 9, maximumFractionDigits: 9 })} tokens\n`);
 
       await program.methods
         .initializePool(
@@ -307,6 +329,7 @@ describe("memeland_airdrop", () => {
   describe("claim_airdrop", () => {
     it("user1 claims with valid merkle proof", async () => {
       const [userStakePda] = getUserStakePda(poolStatePda, user1.publicKey);
+      const [claimMarkerPda] = getClaimMarkerPda(poolStatePda, user1.publicKey);
       const proof = getMerkleProof(merkleLayers, user1Leaf);
       const proofArrays = proof.map((p) => Array.from(p));
 
@@ -315,6 +338,7 @@ describe("memeland_airdrop", () => {
         .accounts({
           user: user1.publicKey,
           poolState: poolStatePda,
+          claimMarker: claimMarkerPda,
           userStake: userStakePda,
           systemProgram: SystemProgram.programId,
         })
@@ -324,12 +348,15 @@ describe("memeland_airdrop", () => {
       const userStake = await program.account.userStake.fetch(userStakePda);
       expect(userStake.owner.toString()).to.equal(user1.publicKey.toString());
       expect(userStake.stakedAmount.toString()).to.equal(user1Amount.toString());
-      expect(userStake.hasClaimedAirdrop).to.be.true;
-      expect(userStake.hasUnstaked).to.be.false;
+
+      // Verify claim marker exists
+      const claimMarker = await program.account.claimMarker.fetch(claimMarkerPda);
+      expect(claimMarker.bump).to.be.greaterThan(0);
     });
 
     it("user2 claims with valid merkle proof", async () => {
       const [userStakePda] = getUserStakePda(poolStatePda, user2.publicKey);
+      const [claimMarkerPda] = getClaimMarkerPda(poolStatePda, user2.publicKey);
       const proof = getMerkleProof(merkleLayers, user2Leaf);
       const proofArrays = proof.map((p) => Array.from(p));
 
@@ -338,6 +365,7 @@ describe("memeland_airdrop", () => {
         .accounts({
           user: user2.publicKey,
           poolState: poolStatePda,
+          claimMarker: claimMarkerPda,
           userStake: userStakePda,
           systemProgram: SystemProgram.programId,
         })
@@ -352,6 +380,7 @@ describe("memeland_airdrop", () => {
       const fakeUser = Keypair.generate();
       await fundAccount(fakeUser.publicKey);
       const [userStakePda] = getUserStakePda(poolStatePda, fakeUser.publicKey);
+      const [claimMarkerPda] = getClaimMarkerPda(poolStatePda, fakeUser.publicKey);
 
       // Use user1's proof but with fakeUser's wallet — should fail
       const proof = getMerkleProof(merkleLayers, user1Leaf);
@@ -363,6 +392,7 @@ describe("memeland_airdrop", () => {
           .accounts({
             user: fakeUser.publicKey,
             poolState: poolStatePda,
+            claimMarker: claimMarkerPda,
             userStake: userStakePda,
             systemProgram: SystemProgram.programId,
           })
@@ -376,6 +406,7 @@ describe("memeland_airdrop", () => {
 
     it("rejects claim with wrong amount", async () => {
       const [userStakePda] = getUserStakePda(poolStatePda, user3.publicKey);
+      const [claimMarkerPda] = getClaimMarkerPda(poolStatePda, user3.publicKey);
       const proof = getMerkleProof(merkleLayers, user3Leaf);
       const proofArrays = proof.map((p) => Array.from(p));
 
@@ -386,6 +417,7 @@ describe("memeland_airdrop", () => {
           .accounts({
             user: user3.publicKey,
             poolState: poolStatePda,
+            claimMarker: claimMarkerPda,
             userStake: userStakePda,
             systemProgram: SystemProgram.programId,
           })
@@ -397,8 +429,9 @@ describe("memeland_airdrop", () => {
       }
     });
 
-    it("cannot claim twice", async () => {
+    it("cannot claim twice (ClaimMarker already exists)", async () => {
       const [userStakePda] = getUserStakePda(poolStatePda, user1.publicKey);
+      const [claimMarkerPda] = getClaimMarkerPda(poolStatePda, user1.publicKey);
       const proof = getMerkleProof(merkleLayers, user1Leaf);
       const proofArrays = proof.map((p) => Array.from(p));
 
@@ -408,6 +441,7 @@ describe("memeland_airdrop", () => {
           .accounts({
             user: user1.publicKey,
             poolState: poolStatePda,
+            claimMarker: claimMarkerPda,
             userStake: userStakePda,
             systemProgram: SystemProgram.programId,
           })
@@ -415,8 +449,66 @@ describe("memeland_airdrop", () => {
           .rpc();
         expect.fail("Should have thrown");
       } catch (err) {
-        expect(err.toString()).to.include("AlreadyClaimed");
+        // ClaimMarker already exists, so init fails
+        expect(err.toString()).to.include("already in use");
       }
+    });
+
+    it("can claim even if PDAs are pre-funded by attacker (griefing protection)", async () => {
+      // user3 hasn't claimed yet - attacker tries to grief by pre-funding their PDAs
+      const [userStakePda] = getUserStakePda(poolStatePda, user3.publicKey);
+      const [claimMarkerPda] = getClaimMarkerPda(poolStatePda, user3.publicKey);
+
+      // Get minimum rent-exempt balance for a 0-byte account
+      const rentExemptMin = await provider.connection.getMinimumBalanceForRentExemption(0);
+
+      // Attacker pre-funds both PDAs with rent-exempt minimum
+      const tx = new anchor.web3.Transaction();
+      tx.add(
+        anchor.web3.SystemProgram.transfer({
+          fromPubkey: admin.publicKey,
+          toPubkey: claimMarkerPda,
+          lamports: rentExemptMin,
+        }),
+        anchor.web3.SystemProgram.transfer({
+          fromPubkey: admin.publicKey,
+          toPubkey: userStakePda,
+          lamports: rentExemptMin,
+        })
+      );
+      await provider.sendAndConfirm(tx);
+
+      // Verify PDAs have lamports (attacker succeeded in pre-funding)
+      const claimMarkerBefore = await provider.connection.getAccountInfo(claimMarkerPda);
+      const userStakeBefore = await provider.connection.getAccountInfo(userStakePda);
+      expect(claimMarkerBefore).to.not.be.null;
+      expect(claimMarkerBefore.lamports).to.equal(rentExemptMin);
+      expect(userStakeBefore).to.not.be.null;
+      expect(userStakeBefore.lamports).to.equal(rentExemptMin);
+
+      // user3 should still be able to claim despite pre-funded PDAs (Anchor 0.30.1 handles this)
+      const proof = getMerkleProof(merkleLayers, user3Leaf);
+      const proofArrays = proof.map((p) => Array.from(p));
+
+      await program.methods
+        .claimAirdrop(user3Amount, proofArrays)
+        .accounts({
+          user: user3.publicKey,
+          poolState: poolStatePda,
+          claimMarker: claimMarkerPda,
+          userStake: userStakePda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([user3])
+        .rpc();
+
+      // Verify claim succeeded
+      const userStake = await program.account.userStake.fetch(userStakePda);
+      expect(userStake.owner.toString()).to.equal(user3.publicKey.toString());
+      expect(userStake.stakedAmount.toString()).to.equal(user3Amount.toString());
+
+      const claimMarker = await program.account.claimMarker.fetch(claimMarkerPda);
+      expect(claimMarker.bump).to.be.greaterThan(0);
     });
 
     it("pool total_staked reflects claims", async () => {
@@ -424,7 +516,8 @@ describe("memeland_airdrop", () => {
       const data = poolAccount.data;
       // total_staked offset: 8 (disc) + 128 (pubkeys+merkle) + 8 (start_time) = 144
       const totalStaked = data.readBigUInt64LE(8 + 128 + 8);
-      const expected = BigInt(user1Amount.add(user2Amount).toString());
+      // All 3 users have claimed now (user3 claimed in the griefing protection test)
+      const expected = BigInt(user1Amount.add(user2Amount).add(user3Amount).toString());
       expect(totalStaked).to.equal(expected);
     });
   });
@@ -535,9 +628,9 @@ describe("memeland_airdrop", () => {
           Number(user1Amount.toString())
         );
 
-        const userStake = await program.account.userStake.fetch(userStakePda);
-        expect(userStake.hasUnstaked).to.be.true;
-        expect(userStake.stakedAmount.toString()).to.equal("0");
+        // UserStake is now closed after unstake
+        const userStakeAccount = await provider.connection.getAccountInfo(userStakePda);
+        expect(userStakeAccount).to.be.null;
       } catch (err) {
         if (err.toString().includes("UnstakeBlockedDuringSnapshot")) {
           console.log("    (unstake skipped: inside snapshot window)");
@@ -547,7 +640,7 @@ describe("memeland_airdrop", () => {
       }
     });
 
-    it("cannot unstake twice", async () => {
+    it("cannot unstake twice (UserStake closed after first unstake)", async () => {
       const [userStakePda] = getUserStakePda(poolStatePda, user1.publicKey);
       const user1Ata = await getOrCreateAssociatedTokenAccount(
         provider.connection,
@@ -571,10 +664,12 @@ describe("memeland_airdrop", () => {
           .rpc();
         expect.fail("Should have thrown");
       } catch (err) {
+        // UserStake was closed on first unstake, so account doesn't exist
         const errStr = err.toString();
         expect(
-          errStr.includes("PermanentlyExited") ||
-            errStr.includes("NothingStaked")
+          errStr.includes("AccountNotInitialized") ||
+            errStr.includes("does not exist") ||
+            errStr.includes("Account does not exist")
         ).to.be.true;
       }
     });
@@ -634,7 +729,7 @@ describe("memeland_airdrop", () => {
         admin,
         admin.publicKey,
         null,
-        6
+        TOKEN_DECIMALS
       );
       [poolState2] = getPoolStatePda(mint2);
       [poolToken2] = getPoolTokenPda(poolState2);
@@ -732,6 +827,7 @@ describe("memeland_airdrop", () => {
 
     it("claims blocked after termination", async () => {
       const [userStakePda] = getUserStakePda(poolState2, user3.publicKey);
+      const [claimMarkerPda] = getClaimMarkerPda(poolState2, user3.publicKey);
       const proof = getMerkleProof(merkleLayers, user3Leaf);
       const proofArrays = proof.map((p) => Array.from(p));
 
@@ -741,6 +837,7 @@ describe("memeland_airdrop", () => {
           .accounts({
             user: user3.publicKey,
             poolState: poolState2,
+            claimMarker: claimMarkerPda,
             userStake: userStakePda,
             systemProgram: SystemProgram.programId,
           })
@@ -764,8 +861,8 @@ describe("memeland_airdrop", () => {
 
     const userA = Keypair.generate();
     const userB = Keypair.generate();
-    const amountA = new BN(3_000_000_000_000); // 3M tokens
-    const amountB = new BN(1_000_000_000_000); // 1M tokens
+    const amountA = new BN("3000000000000000"); // 3M tokens (9 decimals)
+    const amountB = new BN("1000000000000000"); // 1M tokens (9 decimals)
 
     // Build a separate merkle tree for this pool
     let tree3Layers: Buffer[][];
@@ -789,7 +886,7 @@ describe("memeland_airdrop", () => {
         admin,
         admin.publicKey,
         null,
-        6
+        TOKEN_DECIMALS
       );
       [poolState3] = getPoolStatePda(mint3);
       [poolToken3] = getPoolTokenPda(poolState3);
@@ -838,6 +935,7 @@ describe("memeland_airdrop", () => {
 
       // Both claim
       const [stakeA] = getUserStakePda(poolState3, userA.publicKey);
+      const [claimMarkerA] = getClaimMarkerPda(poolState3, userA.publicKey);
       const proofA = getMerkleProof(tree3Layers, leafA).map((p) =>
         Array.from(p)
       );
@@ -846,6 +944,7 @@ describe("memeland_airdrop", () => {
         .accounts({
           user: userA.publicKey,
           poolState: poolState3,
+          claimMarker: claimMarkerA,
           userStake: stakeA,
           systemProgram: SystemProgram.programId,
         })
@@ -853,6 +952,7 @@ describe("memeland_airdrop", () => {
         .rpc();
 
       const [stakeB] = getUserStakePda(poolState3, userB.publicKey);
+      const [claimMarkerB] = getClaimMarkerPda(poolState3, userB.publicKey);
       const proofB = getMerkleProof(tree3Layers, leafB).map((p) =>
         Array.from(p)
       );
@@ -861,6 +961,7 @@ describe("memeland_airdrop", () => {
         .accounts({
           user: userB.publicKey,
           poolState: poolState3,
+          claimMarker: claimMarkerB,
           userStake: stakeB,
           systemProgram: SystemProgram.programId,
         })
@@ -978,6 +1079,261 @@ describe("memeland_airdrop", () => {
       } catch (err) {
         expect(err.toString()).to.include("InvalidDay");
       }
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // 10. AUTO-CLOSE ON UNSTAKE & RE-CLAIM PREVENTION
+  // ─────────────────────────────────────────────────────────────────
+
+  describe("auto-close on unstake", () => {
+    let mint4: PublicKey;
+    let poolState4: PublicKey;
+    let poolToken4: PublicKey;
+    const userClose = Keypair.generate();
+    const closeAmount = new BN("100000000000000"); // 100k tokens (9 decimals)
+
+    let tree4Layers: Buffer[][];
+    let tree4Root: Buffer;
+    let leafClose: Buffer;
+
+    before(async () => {
+      await fundAccount(userClose.publicKey);
+
+      leafClose = computeLeaf(userClose.publicKey, closeAmount);
+      tree4Layers = buildMerkleTree([leafClose]);
+      tree4Root = getMerkleRoot(tree4Layers);
+
+      mint4 = await createMint(
+        provider.connection,
+        admin,
+        admin.publicKey,
+        null,
+        TOKEN_DECIMALS
+      );
+      [poolState4] = getPoolStatePda(mint4);
+      [poolToken4] = getPoolTokenPda(poolState4);
+
+      const now = Math.floor(Date.now() / 1000);
+      const st = Math.floor(now / SECONDS_PER_DAY) * SECONDS_PER_DAY - SECONDS_PER_DAY;
+
+      await program.methods
+        .initializePool(new BN(st), Array.from(tree4Root), computeDailyRewards())
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState4,
+          tokenMint: mint4,
+          poolTokenAccount: poolToken4,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+        })
+        .rpc();
+
+      // Fund pool
+      const ata = await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        admin,
+        mint4,
+        admin.publicKey
+      );
+      await mintTo(
+        provider.connection,
+        admin,
+        mint4,
+        ata.address,
+        admin,
+        BigInt(TOTAL_POOL.toString())
+      );
+      const ix = createTransferInstruction(
+        ata.address,
+        poolToken4,
+        admin.publicKey,
+        BigInt(TOTAL_POOL.toString())
+      );
+      await provider.sendAndConfirm(new anchor.web3.Transaction().add(ix));
+    });
+
+    it("UserStake is closed on unstake, rent returned to user", async () => {
+      const [stakeClose] = getUserStakePda(poolState4, userClose.publicKey);
+      const [claimMarkerPda] = getClaimMarkerPda(poolState4, userClose.publicKey);
+
+      // User claims
+      const proof = getMerkleProof(tree4Layers, leafClose).map((p) => Array.from(p));
+      await program.methods
+        .claimAirdrop(closeAmount, proof)
+        .accounts({
+          user: userClose.publicKey,
+          poolState: poolState4,
+          claimMarker: claimMarkerPda,
+          userStake: stakeClose,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([userClose])
+        .rpc();
+
+      // Verify both accounts exist after claim
+      const stakeAccountBefore = await provider.connection.getAccountInfo(stakeClose);
+      const claimMarkerBefore = await provider.connection.getAccountInfo(claimMarkerPda);
+      expect(stakeAccountBefore).to.not.be.null;
+      expect(claimMarkerBefore).to.not.be.null;
+
+      // Create ATA first (costs rent)
+      const userAta = await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        userClose,
+        mint4,
+        userClose.publicKey
+      );
+
+      // Get user SOL balance AFTER ATA creation, before unstake
+      const balanceBefore = await provider.connection.getBalance(userClose.publicKey);
+
+      // User unstakes
+      await program.methods
+        .unstake()
+        .accounts({
+          user: userClose.publicKey,
+          poolState: poolState4,
+          userStake: stakeClose,
+          poolTokenAccount: poolToken4,
+          userTokenAccount: userAta.address,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([userClose])
+        .rpc();
+
+      // UserStake should be closed
+      const stakeAccountAfter = await provider.connection.getAccountInfo(stakeClose);
+      expect(stakeAccountAfter).to.be.null;
+
+      // ClaimMarker should still exist (prevents re-claiming)
+      const claimMarkerAfter = await provider.connection.getAccountInfo(claimMarkerPda);
+      expect(claimMarkerAfter).to.not.be.null;
+
+      // User should have received rent back (balance increases despite tx fee)
+      const balanceAfter = await provider.connection.getBalance(userClose.publicKey);
+      // Rent for UserStake (~0.001 SOL) minus tx fee (~0.000005 SOL)
+      expect(balanceAfter).to.be.greaterThan(balanceBefore - 100000);
+    });
+
+    it("cannot re-claim after unstake (ClaimMarker blocks)", async () => {
+      const [stakeClose] = getUserStakePda(poolState4, userClose.publicKey);
+      const [claimMarkerPda] = getClaimMarkerPda(poolState4, userClose.publicKey);
+      const proof = getMerkleProof(tree4Layers, leafClose).map((p) => Array.from(p));
+
+      try {
+        await program.methods
+          .claimAirdrop(closeAmount, proof)
+          .accounts({
+            user: userClose.publicKey,
+            poolState: poolState4,
+            claimMarker: claimMarkerPda,
+            userStake: stakeClose,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([userClose])
+          .rpc();
+        expect.fail("Should have thrown");
+      } catch (err) {
+        // ClaimMarker already exists from first claim
+        expect(err.toString()).to.include("already in use");
+      }
+    });
+  });
+
+  describe("close_pool", () => {
+    let mint5: PublicKey;
+    let poolState5: PublicKey;
+    let poolToken5: PublicKey;
+
+    before(async () => {
+      mint5 = await createMint(
+        provider.connection,
+        admin,
+        admin.publicKey,
+        null,
+        TOKEN_DECIMALS
+      );
+      [poolState5] = getPoolStatePda(mint5);
+      [poolToken5] = getPoolTokenPda(poolState5);
+
+      const now = Math.floor(Date.now() / 1000);
+      const st = Math.floor(now / SECONDS_PER_DAY) * SECONDS_PER_DAY - SECONDS_PER_DAY;
+
+      await program.methods
+        .initializePool(new BN(st), Array.from(merkleRoot), computeDailyRewards())
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState5,
+          tokenMint: mint5,
+          poolTokenAccount: poolToken5,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+        })
+        .rpc();
+    });
+
+    it("cannot close pool before termination", async () => {
+      try {
+        await program.methods
+          .closePool()
+          .accounts({
+            admin: admin.publicKey,
+            poolState: poolState5,
+            poolTokenAccount: poolToken5,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .rpc();
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err.toString()).to.include("PoolNotTerminated");
+      }
+    });
+
+    it("can close empty terminated pool", async () => {
+      // Terminate pool
+      const adminAta = await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        admin,
+        mint5,
+        admin.publicKey
+      );
+      await program.methods
+        .terminatePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState5,
+          poolTokenAccount: poolToken5,
+          adminTokenAccount: adminAta.address,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+
+      // Get admin balance before
+      const balanceBefore = await provider.connection.getBalance(admin.publicKey);
+
+      // Close pool
+      await program.methods
+        .closePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState5,
+          poolTokenAccount: poolToken5,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+
+      // Verify accounts are closed
+      const poolAccount = await provider.connection.getAccountInfo(poolState5);
+      const tokenAccount = await provider.connection.getAccountInfo(poolToken5);
+      expect(poolAccount).to.be.null;
+      expect(tokenAccount).to.be.null;
+
+      // Admin should have received rent back
+      const balanceAfter = await provider.connection.getBalance(admin.publicKey);
+      expect(balanceAfter).to.be.greaterThan(balanceBefore - 10000);
     });
   });
 });

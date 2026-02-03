@@ -12,7 +12,7 @@
  *   wallet,amount
  *   7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV,1000000.000000
  *
- * Amount is in human-readable tokens (6 decimals). The script converts to raw lamports.
+ * Amount is in human-readable tokens (9 decimals). The script converts to raw lamports.
  *
  * The hashing scheme matches the on-chain contract:
  *   leaf = keccak256(wallet_pubkey_bytes || amount_le_u64_bytes)
@@ -26,7 +26,7 @@ import { PublicKey } from "@solana/web3.js";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
-const TOKEN_DECIMALS = 6;
+const TOKEN_DECIMALS = 9;
 
 // ── Merkle tree ─────────────────────────────────────────────────────────────
 
