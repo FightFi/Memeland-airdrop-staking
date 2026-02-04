@@ -21,7 +21,15 @@
     "unpause:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/pause.ts --unpause",
     "unpause:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/pause.ts --unpause",
     "pool-status:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/pause.ts --status",
-    "pool-status:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/pause.ts --status"
+    "pool-status:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/pause.ts --status",
+    "stats:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts",
+    "stats:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts",
+    "stats:devnet:save": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --save",
+    "stats:prod:save": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --save",
+    "stats:devnet:json": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --json",
+    "stats:prod:json": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --json",
+    "stats:devnet:json:save": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --json --save",
+    "stats:prod:json:save": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --json --save"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.31.0",
