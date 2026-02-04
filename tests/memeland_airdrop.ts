@@ -2641,4 +2641,398 @@ describe("memeland_airdrop", () => {
       }
     });
   });
+
+  // ─────────────────────────────────────────────────────────────────
+  // 21. EMERGENCY PAUSE FUNCTIONALITY
+  // ─────────────────────────────────────────────────────────────────
+
+  describe("emergency pause", () => {
+    let mint17: PublicKey;
+    let poolState17: PublicKey;
+    let poolToken17: PublicKey;
+    let pauseUser: Keypair;
+    let merkleRoot17: Buffer;
+    let merkleLayers17: Buffer[][];
+    let pauseUserLeaf: Buffer;
+    let pauseUserAmount: BN;
+
+    before(async () => {
+      // Create a fresh pool for pause tests
+      mint17 = await createMint(
+        provider.connection,
+        admin,
+        admin.publicKey,
+        null,
+        TOKEN_DECIMALS
+      );
+      [poolState17] = getPoolStatePda(mint17);
+      [poolToken17] = getPoolTokenPda(poolState17);
+
+      // Create a new user for this test suite
+      pauseUser = Keypair.generate();
+      await fundAccount(pauseUser.publicKey);
+
+      // Build merkle tree with pauseUser
+      pauseUserAmount = new BN(1000).mul(new BN(10).pow(new BN(TOKEN_DECIMALS)));
+      pauseUserLeaf = computeLeaf(pauseUser.publicKey, pauseUserAmount);
+      merkleLayers17 = buildMerkleTree([pauseUserLeaf]);
+      merkleRoot17 = getMerkleRoot(merkleLayers17);
+
+      const now = Math.floor(Date.now() / 1000);
+      const st = Math.floor(now / SECONDS_PER_DAY) * SECONDS_PER_DAY;
+
+      await program.methods
+        .initializePool(new BN(st), Array.from(merkleRoot17), computeDailyRewards())
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState17,
+          tokenMint: mint17,
+          poolTokenAccount: poolToken17,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+        })
+        .rpc();
+
+      // Fund the pool
+      const adminAta = await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        admin,
+        mint17,
+        admin.publicKey
+      );
+      await mintTo(
+        provider.connection,
+        admin,
+        mint17,
+        adminAta.address,
+        admin,
+        BigInt(TOTAL_POOL.toString())
+      );
+      await provider.connection.sendTransaction(
+        new anchor.web3.Transaction().add(
+          createTransferInstruction(
+            adminAta.address,
+            poolToken17,
+            admin.publicKey,
+            BigInt(TOTAL_POOL.toString())
+          )
+        ),
+        [admin]
+      );
+    });
+
+    it("admin can pause pool", async () => {
+      await program.methods
+        .pausePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState17,
+        })
+        .rpc();
+
+      // Verify paused state
+      const poolAccount = await provider.connection.getAccountInfo(poolState17);
+      // PoolState layout: discriminator(8) + admin(32) + token_mint(32) + pool_token_account(32) +
+      // merkle_root(32) + start_time(8) + total_staked(8) + total_airdrop_claimed(8) +
+      // snapshot_count(1) + terminated(1) + bump(1) + pool_token_bump(1) + paused(1) + _padding(3)
+      // Offset for paused: 8+32+32+32+32+8+8+8+1+1+1+1 = 164
+      const paused = poolAccount.data.readUInt8(164);
+      expect(paused).to.equal(1);
+    });
+
+    it("cannot pause already paused pool", async () => {
+      try {
+        await program.methods
+          .pausePool()
+          .accounts({
+            admin: admin.publicKey,
+            poolState: poolState17,
+          })
+          .rpc();
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err.toString()).to.include("AlreadyPaused");
+      }
+    });
+
+    it("claim_airdrop blocked when paused", async () => {
+      const [stake] = getUserStakePda(poolState17, pauseUser.publicKey);
+      const [marker] = getClaimMarkerPda(poolState17, pauseUser.publicKey);
+
+      const proof = getMerkleProof(merkleLayers17, pauseUserLeaf);
+      const proofArrays = proof.map((p) => Array.from(p));
+
+      try {
+        await program.methods
+          .claimAirdrop(pauseUserAmount, proofArrays)
+          .accounts({
+            user: pauseUser.publicKey,
+            poolState: poolState17,
+            claimMarker: marker,
+            userStake: stake,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([pauseUser])
+          .rpc();
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err.toString()).to.include("PoolPaused");
+      }
+    });
+
+    it("snapshot blocked when paused", async () => {
+      try {
+        await program.methods
+          .snapshot()
+          .accounts({
+            poolState: poolState17,
+          })
+          .rpc();
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err.toString()).to.include("PoolPaused");
+      }
+    });
+
+    it("backfill_snapshot blocked when paused", async () => {
+      try {
+        await program.methods
+          .backfillSnapshot(new BN(0))
+          .accounts({
+            admin: admin.publicKey,
+            poolState: poolState17,
+          })
+          .rpc();
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err.toString()).to.include("PoolPaused");
+      }
+    });
+
+    it("non-admin cannot pause pool", async () => {
+      // First unpause so we can test unauthorized pause
+      await program.methods
+        .unpausePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState17,
+        })
+        .rpc();
+
+      try {
+        await program.methods
+          .pausePool()
+          .accounts({
+            admin: pauseUser.publicKey,
+            poolState: poolState17,
+          })
+          .signers([pauseUser])
+          .rpc();
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err.toString()).to.include("nauthorized");
+      }
+    });
+
+    it("non-admin cannot unpause pool", async () => {
+      // Pause the pool again
+      await program.methods
+        .pausePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState17,
+        })
+        .rpc();
+
+      try {
+        await program.methods
+          .unpausePool()
+          .accounts({
+            admin: pauseUser.publicKey,
+            poolState: poolState17,
+          })
+          .signers([pauseUser])
+          .rpc();
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err.toString()).to.include("nauthorized");
+      }
+    });
+
+    it("cannot unpause non-paused pool", async () => {
+      // First unpause
+      await program.methods
+        .unpausePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState17,
+        })
+        .rpc();
+
+      try {
+        await program.methods
+          .unpausePool()
+          .accounts({
+            admin: admin.publicKey,
+            poolState: poolState17,
+          })
+          .rpc();
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err.toString()).to.include("PoolNotPaused");
+      }
+    });
+
+    it("admin can unpause pool and operations resume", async () => {
+      // Pause again
+      await program.methods
+        .pausePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState17,
+        })
+        .rpc();
+
+      // Unpause
+      await program.methods
+        .unpausePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState17,
+        })
+        .rpc();
+
+      // Verify unpaused
+      const poolAccount = await provider.connection.getAccountInfo(poolState17);
+      const paused = poolAccount.data.readUInt8(164);
+      expect(paused).to.equal(0);
+
+      // Now claim should work
+      const [stake] = getUserStakePda(poolState17, pauseUser.publicKey);
+      const [marker] = getClaimMarkerPda(poolState17, pauseUser.publicKey);
+
+      const proof = getMerkleProof(merkleLayers17, pauseUserLeaf);
+      const proofArrays = proof.map((p) => Array.from(p));
+
+      await program.methods
+        .claimAirdrop(pauseUserAmount, proofArrays)
+        .accounts({
+          user: pauseUser.publicKey,
+          poolState: poolState17,
+          claimMarker: marker,
+          userStake: stake,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([pauseUser])
+        .rpc();
+
+      // Verify stake was created
+      const stakeAccount = await provider.connection.getAccountInfo(stake);
+      expect(stakeAccount).to.not.be.null;
+    });
+
+    it("users can unstake even when pool is paused", async () => {
+      // Pause the pool
+      await program.methods
+        .pausePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState17,
+        })
+        .rpc();
+
+      // User should still be able to unstake
+      const [stake] = getUserStakePda(poolState17, pauseUser.publicKey);
+      const userAta = await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        pauseUser,
+        mint17,
+        pauseUser.publicKey
+      );
+
+      // Unstake should succeed even while paused
+      await program.methods
+        .unstake()
+        .accounts({
+          user: pauseUser.publicKey,
+          poolState: poolState17,
+          userStake: stake,
+          poolTokenAccount: poolToken17,
+          userTokenAccount: userAta.address,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([pauseUser])
+        .rpc();
+
+      // Verify user received tokens
+      const balance = (await getAccount(provider.connection, userAta.address)).amount;
+      expect(Number(balance)).to.be.greaterThan(0);
+
+      // Verify stake account is closed
+      const stakeAccount = await provider.connection.getAccountInfo(stake);
+      expect(stakeAccount).to.be.null;
+    });
+
+    it("cannot pause terminated pool", async () => {
+      // Create another pool to test pause on terminated
+      const mint18 = await createMint(
+        provider.connection,
+        admin,
+        admin.publicKey,
+        null,
+        TOKEN_DECIMALS
+      );
+      const [poolState18] = getPoolStatePda(mint18);
+      const [poolToken18] = getPoolTokenPda(poolState18);
+
+      const now = Math.floor(Date.now() / 1000);
+      const st = Math.floor(now / SECONDS_PER_DAY) * SECONDS_PER_DAY;
+
+      await program.methods
+        .initializePool(new BN(st), Array.from(merkleRoot17), computeDailyRewards())
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState18,
+          tokenMint: mint18,
+          poolTokenAccount: poolToken18,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+        })
+        .rpc();
+
+      // Terminate the pool
+      const adminAta = await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        admin,
+        mint18,
+        admin.publicKey
+      );
+      await program.methods
+        .terminatePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: poolState18,
+          poolTokenAccount: poolToken18,
+          adminTokenAccount: adminAta.address,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+
+      // Try to pause terminated pool
+      try {
+        await program.methods
+          .pausePool()
+          .accounts({
+            admin: admin.publicKey,
+            poolState: poolState18,
+          })
+          .rpc();
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err.toString()).to.include("PoolTerminated");
+      }
+    });
+  });
 });

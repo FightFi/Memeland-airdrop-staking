@@ -96,6 +96,7 @@ Day 0-20: Active staking period
   └── Users claim and stake
   └── Admin takes daily snapshots
   └── Users can unstake anytime (after required snapshots)
+  └── Admin can pause/unpause for emergencies
 
 Day 20-35: Exit window (15 days grace period)
   └── No new claims
@@ -105,6 +106,15 @@ After Day 35:
   └── Admin can recover unclaimed rewards (user principal protected)
   └── Admin can close pool when all users have unstaked
 ```
+
+### Emergency Pause
+
+Admin can pause the pool at any time to block:
+- `claim_airdrop` - new claims blocked
+- `snapshot` - snapshots blocked
+- `backfill_snapshot` - backfills blocked
+
+**Users can ALWAYS unstake** even when paused - this protects user funds.
 
 ## Architecture
 
@@ -136,6 +146,8 @@ After Day 35:
 | `snapshot()` | admin | Records daily total_staked |
 | `backfill_snapshot(day)` | admin | Backfill missed snapshot |
 | `unstake()` | user | Exit: returns stake + rewards, closes UserStake |
+| `pause_pool()` | admin | Emergency pause - blocks claims/snapshots |
+| `unpause_pool()` | admin | Resume normal operations |
 | `terminate_pool()` | admin | Stops claims, drains excess tokens |
 | `recover_expired_tokens()` | admin | After day 35, recover unclaimed rewards |
 | `close_pool()` | admin | Close pool when empty |
@@ -148,6 +160,8 @@ PoolInitialized { admin, token_mint, start_time }
 AirdropClaimed { user, amount, claim_day }
 SnapshotTaken { day, total_staked }
 Unstaked { user, principal, rewards }
+PoolPausedEvent { admin }
+PoolUnpausedEvent { admin }
 PoolTerminated { drained_amount }
 TokensRecovered { amount }
 PoolClosed { lamports_returned }
@@ -159,16 +173,13 @@ PoolClosed { lamports_returned }
 memeland-airdrop/
 ├── programs/memeland_airdrop/src/lib.rs   # Smart contract
 ├── target/idl/memeland_airdrop.json       # IDL
-├── tests/memeland_airdrop.ts              # Test suite (27 tests)
+├── tests/memeland_airdrop.ts              # Test suite (64 tests)
 ├── scripts/
 │   ├── build-merkle-tree.ts               # CSV → merkle JSON
 │   ├── initialize-pool.ts                 # Initialize + fund pool
 │   ├── snapshot.ts                        # Daily snapshot caller
 │   ├── utils/rewards.ts                   # Shared reward computation
 │   └── generate-keypairs.ts               # Keypair generator
-├── reports/
-│   ├── audit.md                           # Security audit v1
-│   └── audit_v2.md                        # Security audit v2
 ├── data/
 │   └── allowlist-example.csv              # Example allowlist
 ├── .env.local                             # Local validator config
@@ -187,7 +198,7 @@ memeland-airdrop/
 | `yarn init-pool:prod` | Initialize pool on mainnet |
 | `yarn snapshot:devnet` | Take snapshot on devnet |
 | `yarn snapshot:prod` | Take snapshot on mainnet |
-| `anchor test` | Run test suite (27 tests) |
+| `anchor test` | Run test suite (64 tests) |
 | `anchor build` | Build the program |
 
 ## Environment Variables
@@ -214,7 +225,7 @@ memeland-airdrop/
 # Build
 anchor build
 
-# Test (27 tests)
+# Test (64 tests)
 anchor test
 ```
 
@@ -289,6 +300,22 @@ await program.methods
   .rpc();
 ```
 
+### Emergency Pause/Unpause
+
+```typescript
+// Pause pool (blocks claims, snapshots)
+await program.methods
+  .pausePool()
+  .accounts({ admin: adminPubkey, poolState: poolStatePda })
+  .rpc();
+
+// Unpause pool (resume operations)
+await program.methods
+  .unpausePool()
+  .accounts({ admin: adminPubkey, poolState: poolStatePda })
+  .rpc();
+```
+
 ### Termination
 
 ```bash
@@ -328,6 +355,12 @@ await program.methods
 | 6012 | ExitWindowNotFinished | Must wait until day 35 |
 | 6013 | NothingToRecover | No tokens to recover |
 | 6014 | SnapshotAlreadyExists | Snapshot already taken for this day |
+| 6015 | UnauthorizedAdmin | Signer is not the pool admin |
+| 6016 | InvalidStakeOwner | UserStake owner mismatch |
+| 6017 | InvalidPoolTokenAccount | Pool token account mismatch |
+| 6018 | PoolPaused | Pool is paused - operations disabled |
+| 6019 | PoolNotPaused | Pool is not paused |
+| 6020 | AlreadyPaused | Pool is already paused |
 
 ## Constants
 
@@ -341,14 +374,16 @@ STAKING_POOL = 100M × 10⁹    // 100M tokens (9 decimals)
 
 ## Security
 
-See `reports/audit_v2.md` for the full security audit. Key points:
+ Key points:
 
 - **Merkle claims**: Cryptographically verified, no admin signature needed
 - **ClaimMarker**: Permanent account prevents double-claims
 - **Snapshot protection**: Operations blocked until relevant snapshot taken
 - **Principal protection**: User funds protected in terminate and recovery
-- **PDA security**: All accounts derived from program ID
+- **PDA security**: All accounts derived from program ID with centralized seeds
 - **Overflow protection**: u128 intermediate math with checked operations
+- **Emergency pause**: Admin can pause pool; users can always unstake (funds protected)
+- **Specific error codes**: Constraint errors provide clear debugging information
 
 ## License
 
