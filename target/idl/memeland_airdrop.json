@@ -27,6 +27,9 @@
       "accounts": [
         {
           "name": "admin",
+          "docs": [
+            "Must be the pool admin to take snapshots"
+          ],
           "signer": true
         },
         {
@@ -65,6 +68,9 @@
         },
         {
           "name": "user_stake",
+          "docs": [
+            "User's stake account - read-only for reward calculation"
+          ],
           "pda": {
             "seeds": [
               {
@@ -131,7 +137,8 @@
         {
           "name": "claim_marker",
           "docs": [
-            "Permanent marker that prevents re-claiming (tiny, ~0.001 SOL)"
+            "Permanent marker that prevents re-claiming (tiny, ~0.001 SOL)",
+            "This account exists forever to prevent claim-unstake-reclaim attacks"
           ],
           "writable": true,
           "pda": {
@@ -235,6 +242,9 @@
       "accounts": [
         {
           "name": "admin",
+          "docs": [
+            "Must be the pool admin to close"
+          ],
           "writable": true,
           "signer": true
         },
@@ -244,6 +254,9 @@
         },
         {
           "name": "pool_token_account",
+          "docs": [
+            "Pool's token account - must match and have zero balance to close"
+          ],
           "writable": true
         },
         {
@@ -302,7 +315,10 @@
           }
         },
         {
-          "name": "token_mint"
+          "name": "token_mint",
+          "docs": [
+            "The token mint for this staking pool"
+          ]
         },
         {
           "name": "pool_token_account",
@@ -388,6 +404,9 @@
       "accounts": [
         {
           "name": "admin",
+          "docs": [
+            "Must be the pool admin to recover tokens"
+          ],
           "signer": true
         },
         {
@@ -396,10 +415,16 @@
         },
         {
           "name": "pool_token_account",
+          "docs": [
+            "Pool's token account - must match the one stored in pool_state"
+          ],
           "writable": true
         },
         {
           "name": "admin_token_account",
+          "docs": [
+            "Admin's token account to receive recovered tokens"
+          ],
           "writable": true
         },
         {
@@ -429,6 +454,9 @@
       "accounts": [
         {
           "name": "admin",
+          "docs": [
+            "Must be the pool admin to take snapshots"
+          ],
           "signer": true
         },
         {
@@ -456,6 +484,9 @@
       "accounts": [
         {
           "name": "admin",
+          "docs": [
+            "Must be the pool admin to terminate"
+          ],
           "signer": true
         },
         {
@@ -464,10 +495,16 @@
         },
         {
           "name": "pool_token_account",
+          "docs": [
+            "Pool's token account - must match the one stored in pool_state"
+          ],
           "writable": true
         },
         {
           "name": "admin_token_account",
+          "docs": [
+            "Admin's token account to receive drained tokens"
+          ],
           "writable": true
         },
         {
@@ -506,6 +543,9 @@
         },
         {
           "name": "user_stake",
+          "docs": [
+            "User's stake account - will be closed and rent returned"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -537,10 +577,16 @@
         },
         {
           "name": "pool_token_account",
+          "docs": [
+            "Pool's token account - must match the one stored in pool_state"
+          ],
           "writable": true
         },
         {
           "name": "user_token_account",
+          "docs": [
+            "User's token account to receive principal + rewards"
+          ],
           "writable": true
         },
         {
@@ -689,77 +735,102 @@
     {
       "code": 6000,
       "name": "AirdropPoolExhausted",
-      "msg": "Airdrop pool exhausted"
+      "msg": "Airdrop pool exhausted - no more tokens available for claims"
     },
     {
       "code": 6001,
-      "name": "NothingStaked",
-      "msg": "Nothing staked"
+      "name": "PoolTerminated",
+      "msg": "Pool has been terminated - no new claims allowed"
     },
     {
       "code": 6002,
-      "name": "Unauthorized",
-      "msg": "Unauthorized"
+      "name": "AlreadyTerminated",
+      "msg": "Pool is already terminated - cannot terminate twice"
     },
     {
       "code": 6003,
-      "name": "InvalidMerkleProof",
-      "msg": "Invalid merkle proof"
-    },
-    {
-      "code": 6004,
-      "name": "PoolTerminated",
-      "msg": "Pool has been terminated"
-    },
-    {
-      "code": 6005,
-      "name": "AlreadyTerminated",
-      "msg": "Pool is already terminated"
-    },
-    {
-      "code": 6006,
-      "name": "InvalidDay",
-      "msg": "Invalid day"
-    },
-    {
-      "code": 6007,
-      "name": "SnapshotTooEarly",
-      "msg": "Snapshot too early - day not yet elapsed"
-    },
-    {
-      "code": 6008,
-      "name": "SnapshotRequiredFirst",
-      "msg": "Today's snapshot must be taken before claims/unstakes"
-    },
-    {
-      "code": 6009,
-      "name": "InvalidDailyRewards",
-      "msg": "Daily rewards must sum to exactly STAKING_POOL"
-    },
-    {
-      "code": 6010,
       "name": "PoolNotTerminated",
       "msg": "Pool must be terminated before closing"
     },
     {
-      "code": 6011,
+      "code": 6004,
       "name": "PoolNotEmpty",
       "msg": "Pool still has staked funds - all users must unstake first"
     },
     {
+      "code": 6005,
+      "name": "InvalidDailyRewards",
+      "msg": "Daily rewards must sum to exactly STAKING_POOL (100M tokens)"
+    },
+    {
+      "code": 6006,
+      "name": "NothingStaked",
+      "msg": "Nothing staked - user has no active stake"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidStakeOwner",
+      "msg": "User does not own this stake account"
+    },
+    {
+      "code": 6008,
+      "name": "UnauthorizedAdmin",
+      "msg": "Unauthorized - caller is not the pool admin"
+    },
+    {
+      "code": 6009,
+      "name": "Unauthorized",
+      "msg": "Unauthorized - generic access denied"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidMerkleProof",
+      "msg": "Invalid merkle proof - verification failed"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidDay",
+      "msg": "Invalid day - must be between 1 and 20"
+    },
+    {
       "code": 6012,
-      "name": "ExitWindowNotFinished",
-      "msg": "Exit window not finished - must wait until day 35"
+      "name": "SnapshotTooEarly",
+      "msg": "Snapshot too early - day has not yet elapsed"
     },
     {
       "code": 6013,
-      "name": "NothingToRecover",
-      "msg": "No tokens to recover"
+      "name": "SnapshotRequiredFirst",
+      "msg": "Previous day's snapshot must be taken before claims/unstakes"
     },
     {
       "code": 6014,
       "name": "SnapshotAlreadyExists",
-      "msg": "Snapshot already exists for this day"
+      "msg": "Snapshot already exists for this day - cannot overwrite"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidPoolTokenAccount",
+      "msg": "Invalid pool token account - does not match pool state"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidUserTokenMint",
+      "msg": "Invalid user token account - mint does not match pool"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidAdminTokenMint",
+      "msg": "Invalid admin token account - mint does not match pool"
+    },
+    {
+      "code": 6018,
+      "name": "ExitWindowNotFinished",
+      "msg": "Exit window not finished - must wait until day 35"
+    },
+    {
+      "code": 6019,
+      "name": "NothingToRecover",
+      "msg": "No tokens to recover - pool balance equals staked amount"
     }
   ],
   "types": [

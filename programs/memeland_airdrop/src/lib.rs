@@ -20,6 +20,16 @@ pub const STAKING_POOL: u64 = 100_000_000_000_000_000;
 // 32 + 32 + 32 + 32 + 8 + 8 + 8 + 1 + 1 + 1 + 1 + 4 + (32*8) + (32*8) = 672
 pub const POOL_STATE_SIZE: usize = 672;
 
+// ── Seeds ──────────────────────────────────────────────────────────────────────
+
+/// PDA seed constants for consistent usage across the program
+pub mod seeds {
+    pub const POOL_STATE: &[u8] = b"pool_state";
+    pub const POOL_TOKEN: &[u8] = b"pool_token";
+    pub const USER_STAKE: &[u8] = b"user_stake";
+    pub const CLAIMED: &[u8] = b"claimed";
+}
+
 // ── Program ────────────────────────────────────────────────────────────────────
 
 #[program]
@@ -259,7 +269,7 @@ pub mod memeland_airdrop {
         // Transfer tokens via PDA signer
         let pool_state_key = ctx.accounts.pool_state.key();
         let seeds = &[
-            b"pool_token",
+            seeds::POOL_TOKEN,
             pool_state_key.as_ref(),
             &[pool.pool_token_bump],
         ];
@@ -312,7 +322,7 @@ pub mod memeland_airdrop {
         if drainable > 0 {
             let pool_state_key = ctx.accounts.pool_state.key();
             let seeds = &[
-                b"pool_token",
+                seeds::POOL_TOKEN,
                 pool_state_key.as_ref(),
                 &[pool.pool_token_bump],
             ];
@@ -400,7 +410,7 @@ pub mod memeland_airdrop {
 
         let pool_state_key = ctx.accounts.pool_state.key();
         let seeds = &[
-            b"pool_token",
+            seeds::POOL_TOKEN,
             pool_state_key.as_ref(),
             &[pool.pool_token_bump],
         ];
@@ -439,7 +449,7 @@ pub mod memeland_airdrop {
         // Close the pool token account (SPL close_account CPI)
         let pool_state_key = ctx.accounts.pool_state.key();
         let seeds = &[
-            b"pool_token",
+            seeds::POOL_TOKEN,
             pool_state_key.as_ref(),
             &[pool_token_bump],
         ];
@@ -560,17 +570,18 @@ pub struct InitializePool<'info> {
         init,
         payer = admin,
         space = 8 + POOL_STATE_SIZE,
-        seeds = [b"pool_state", token_mint.key().as_ref()],
+        seeds = [seeds::POOL_STATE, token_mint.key().as_ref()],
         bump,
     )]
     pub pool_state: AccountLoader<'info, PoolState>,
 
+    /// The token mint for this staking pool
     pub token_mint: Account<'info, Mint>,
 
     #[account(
         init,
         payer = admin,
-        seeds = [b"pool_token", pool_state.key().as_ref()],
+        seeds = [seeds::POOL_TOKEN, pool_state.key().as_ref()],
         bump,
         token::mint = token_mint,
         token::authority = pool_token_account,
@@ -591,11 +602,12 @@ pub struct ClaimAirdrop<'info> {
     pub pool_state: AccountLoader<'info, PoolState>,
 
     /// Permanent marker that prevents re-claiming (tiny, ~0.001 SOL)
+    /// This account exists forever to prevent claim-unstake-reclaim attacks
     #[account(
         init,
         payer = user,
         space = 8 + ClaimMarker::INIT_SPACE,
-        seeds = [b"claimed", pool_state.key().as_ref(), user.key().as_ref()],
+        seeds = [seeds::CLAIMED, pool_state.key().as_ref(), user.key().as_ref()],
         bump,
     )]
     pub claim_marker: Account<'info, ClaimMarker>,
@@ -605,7 +617,7 @@ pub struct ClaimAirdrop<'info> {
         init,
         payer = user,
         space = 8 + UserStake::INIT_SPACE,
-        seeds = [b"user_stake", pool_state.key().as_ref(), user.key().as_ref()],
+        seeds = [seeds::USER_STAKE, pool_state.key().as_ref(), user.key().as_ref()],
         bump,
     )]
     pub user_stake: Account<'info, UserStake>,
@@ -615,8 +627,9 @@ pub struct ClaimAirdrop<'info> {
 
 #[derive(Accounts)]
 pub struct Snapshot<'info> {
+    /// Must be the pool admin to take snapshots
     #[account(
-        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::Unauthorized,
+        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::UnauthorizedAdmin,
     )]
     pub admin: Signer<'info>,
 
@@ -632,21 +645,24 @@ pub struct Unstake<'info> {
     #[account(mut)]
     pub pool_state: AccountLoader<'info, PoolState>,
 
+    /// User's stake account - will be closed and rent returned
     #[account(
         mut,
-        seeds = [b"user_stake", pool_state.key().as_ref(), user.key().as_ref()],
+        seeds = [seeds::USER_STAKE, pool_state.key().as_ref(), user.key().as_ref()],
         bump = user_stake.bump,
-        constraint = user_stake.owner == user.key() @ ErrorCode::Unauthorized,
-        close = user,  // Return rent to user
+        constraint = user_stake.owner == user.key() @ ErrorCode::InvalidStakeOwner,
+        close = user,
     )]
     pub user_stake: Account<'info, UserStake>,
 
+    /// Pool's token account - must match the one stored in pool_state
     #[account(
         mut,
-        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::Unauthorized,
+        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
     )]
     pub pool_token_account: Account<'info, TokenAccount>,
 
+    /// User's token account to receive principal + rewards
     #[account(
         mut,
         token::mint = pool_state.load()?.token_mint,
@@ -659,20 +675,23 @@ pub struct Unstake<'info> {
 
 #[derive(Accounts)]
 pub struct TerminatePool<'info> {
+    /// Must be the pool admin to terminate
     #[account(
-        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::Unauthorized,
+        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::UnauthorizedAdmin,
     )]
     pub admin: Signer<'info>,
 
     #[account(mut)]
     pub pool_state: AccountLoader<'info, PoolState>,
 
+    /// Pool's token account - must match the one stored in pool_state
     #[account(
         mut,
-        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::Unauthorized,
+        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
     )]
     pub pool_token_account: Account<'info, TokenAccount>,
 
+    /// Admin's token account to receive drained tokens
     #[account(
         mut,
         token::mint = pool_state.load()?.token_mint,
@@ -687,8 +706,9 @@ pub struct TerminatePool<'info> {
 pub struct CalculateRewards<'info> {
     pub pool_state: AccountLoader<'info, PoolState>,
 
+    /// User's stake account - read-only for reward calculation
     #[account(
-        seeds = [b"user_stake", pool_state.key().as_ref(), user_stake.owner.as_ref()],
+        seeds = [seeds::USER_STAKE, pool_state.key().as_ref(), user_stake.owner.as_ref()],
         bump = user_stake.bump,
     )]
     pub user_stake: Account<'info, UserStake>,
@@ -696,18 +716,20 @@ pub struct CalculateRewards<'info> {
 
 #[derive(Accounts)]
 pub struct ClosePool<'info> {
+    /// Must be the pool admin to close
     #[account(
         mut,
-        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::Unauthorized,
+        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::UnauthorizedAdmin,
     )]
     pub admin: Signer<'info>,
 
     #[account(mut)]
     pub pool_state: AccountLoader<'info, PoolState>,
 
+    /// Pool's token account - must match and have zero balance to close
     #[account(
         mut,
-        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::Unauthorized,
+        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
     )]
     pub pool_token_account: Account<'info, TokenAccount>,
 
@@ -716,20 +738,23 @@ pub struct ClosePool<'info> {
 
 #[derive(Accounts)]
 pub struct RecoverExpiredTokens<'info> {
+    /// Must be the pool admin to recover tokens
     #[account(
-        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::Unauthorized,
+        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::UnauthorizedAdmin,
     )]
     pub admin: Signer<'info>,
 
     #[account(mut)]
     pub pool_state: AccountLoader<'info, PoolState>,
 
+    /// Pool's token account - must match the one stored in pool_state
     #[account(
         mut,
-        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::Unauthorized,
+        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
     )]
     pub pool_token_account: Account<'info, TokenAccount>,
 
+    /// Admin's token account to receive recovered tokens
     #[account(
         mut,
         token::mint = pool_state.load()?.token_mint,
@@ -829,34 +854,57 @@ pub struct PoolClosed {
 
 #[error_code]
 pub enum ErrorCode {
-    #[msg("Airdrop pool exhausted")]
+    // ── Pool Errors ────────────────────────────────────────────────────────────
+    #[msg("Airdrop pool exhausted - no more tokens available for claims")]
     AirdropPoolExhausted,
-    #[msg("Nothing staked")]
-    NothingStaked,
-    #[msg("Unauthorized")]
-    Unauthorized,
-    #[msg("Invalid merkle proof")]
-    InvalidMerkleProof,
-    #[msg("Pool has been terminated")]
+    #[msg("Pool has been terminated - no new claims allowed")]
     PoolTerminated,
-    #[msg("Pool is already terminated")]
+    #[msg("Pool is already terminated - cannot terminate twice")]
     AlreadyTerminated,
-    #[msg("Invalid day")]
-    InvalidDay,
-    #[msg("Snapshot too early - day not yet elapsed")]
-    SnapshotTooEarly,
-    #[msg("Today's snapshot must be taken before claims/unstakes")]
-    SnapshotRequiredFirst,
-    #[msg("Daily rewards must sum to exactly STAKING_POOL")]
-    InvalidDailyRewards,
     #[msg("Pool must be terminated before closing")]
     PoolNotTerminated,
     #[msg("Pool still has staked funds - all users must unstake first")]
     PoolNotEmpty,
-    #[msg("Exit window not finished - must wait until day 35")]
-    ExitWindowNotFinished, 
-    #[msg("No tokens to recover")]
-    NothingToRecover,
-    #[msg("Snapshot already exists for this day")]
+    #[msg("Daily rewards must sum to exactly STAKING_POOL (100M tokens)")]
+    InvalidDailyRewards,
+
+    // ── Stake Errors ───────────────────────────────────────────────────────────
+    #[msg("Nothing staked - user has no active stake")]
+    NothingStaked,
+    #[msg("User does not own this stake account")]
+    InvalidStakeOwner,
+
+    // ── Authorization Errors ───────────────────────────────────────────────────
+    #[msg("Unauthorized - caller is not the pool admin")]
+    UnauthorizedAdmin,
+    #[msg("Unauthorized - generic access denied")]
+    Unauthorized,
+
+    // ── Merkle Proof Errors ────────────────────────────────────────────────────
+    #[msg("Invalid merkle proof - verification failed")]
+    InvalidMerkleProof,
+
+    // ── Snapshot Errors ────────────────────────────────────────────────────────
+    #[msg("Invalid day - must be between 1 and 20")]
+    InvalidDay,
+    #[msg("Snapshot too early - day has not yet elapsed")]
+    SnapshotTooEarly,
+    #[msg("Previous day's snapshot must be taken before claims/unstakes")]
+    SnapshotRequiredFirst,
+    #[msg("Snapshot already exists for this day - cannot overwrite")]
     SnapshotAlreadyExists,
+
+    // ── Token Account Errors ───────────────────────────────────────────────────
+    #[msg("Invalid pool token account - does not match pool state")]
+    InvalidPoolTokenAccount,
+    #[msg("Invalid user token account - mint does not match pool")]
+    InvalidUserTokenMint,
+    #[msg("Invalid admin token account - mint does not match pool")]
+    InvalidAdminTokenMint,
+
+    // ── Recovery Errors ────────────────────────────────────────────────────────
+    #[msg("Exit window not finished - must wait until day 35")]
+    ExitWindowNotFinished,
+    #[msg("No tokens to recover - pool balance equals staked amount")]
+    NothingToRecover,
 }
