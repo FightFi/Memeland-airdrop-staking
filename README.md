@@ -196,8 +196,10 @@ memeland-airdrop/
 | `yarn generate-keypairs` | Generate admin + mint keypairs |
 | `yarn init-pool:devnet` | Initialize pool on devnet |
 | `yarn init-pool:prod` | Initialize pool on mainnet |
-| `yarn snapshot:devnet` | Take snapshot on devnet |
-| `yarn snapshot:prod` | Take snapshot on mainnet |
+| `yarn snapshot:devnet` | Take today's snapshot on devnet (idempotent) |
+| `yarn snapshot:prod` | Take today's snapshot on mainnet (idempotent) |
+| `yarn snapshot:devnet:backfill` | Backfill all missing snapshots (devnet) |
+| `yarn snapshot:prod:backfill` | Backfill all missing snapshots (mainnet) |
 | `anchor test` | Run test suite (64 tests) |
 | `anchor build` | Build the program |
 
@@ -276,28 +278,51 @@ yarn init-pool:prod
 
 ### Daily Snapshot
 
-Take snapshot once per day (anytime):
+The snapshot script is smart and idempotent:
+- Detects the current program day
+- Checks if snapshot already exists for today
+- Only takes snapshot if missing
+- Handles pool paused/terminated states
 
 ```bash
+# Take today's snapshot (safe to run multiple times)
 yarn snapshot:prod
+
+# Backfill ALL missing snapshots (days 1 to current)
+yarn snapshot:prod:backfill
 ```
 
-Automate with cron:
+Automate with cron (script handles idempotency):
 
 ```bash
-# Run daily at 6 AM UTC
+# Run daily at 6 AM UTC - safe to run even if already taken
 0 6 * * * cd /path/to/project && yarn snapshot:prod >> logs/snapshot.log 2>&1
 ```
 
-### Backfill Missed Snapshots
+Example output:
+```
+============================================================
+Memeland Airdrop - Snapshot Script
+============================================================
+Current UTC time: Tue, 04 Feb 2026 15:30:00 GMT
+Pool start time:  Mon, 03 Feb 2026 00:00:00 GMT
+Current day:      2 / 20
+Total staked:     1000000 tokens
+Snapshot count:   1
+Pool paused:      NO
+Pool terminated:  NO
+============================================================
 
-If a snapshot is missed, use `backfill_snapshot`:
+Missing snapshots for days: 2
 
-```typescript
-await program.methods
-  .backfillSnapshot(new BN(dayNumber))
-  .accounts({ admin: adminPubkey, poolState: poolStatePda })
-  .rpc();
+Will take snapshots for days: 2
+
+[Day 2] Calling snapshot()...
+[Day 2] Success! TX: 5abc...
+
+============================================================
+Completed: 1/1 snapshots taken.
+============================================================
 ```
 
 ### Emergency Pause/Unpause
