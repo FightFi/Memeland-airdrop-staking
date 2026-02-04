@@ -4,11 +4,260 @@
     "name": "memeland_airdrop",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Memeland $FIGHT Airdrop & 20-Day Exponential Staking Program"
+    "description": "Memeland Airdrop & 60-Day Exponential Staking Program"
   },
   "instructions": [
     {
+      "name": "backfill_snapshot",
+      "docs": [
+        "Admin can backfill snapshots for missed days.",
+        "Only for emergencies when regular snapshot() failed.",
+        "Cannot overwrite existing snapshots."
+      ],
+      "discriminator": [
+        154,
+        75,
+        153,
+        15,
+        64,
+        254,
+        54,
+        39
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "pool_state",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "day",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "calculate_rewards",
+      "docs": [
+        "View function: calculate potential rewards for a user on a given day.",
+        "For past days with snapshots, uses actual values.",
+        "For future days, uses the last snapshot's total_staked.",
+        "Note: After unstake, UserStake is closed so this instruction will fail (account not found)."
+      ],
+      "discriminator": [
+        199,
+        115,
+        201,
+        124,
+        71,
+        81,
+        143,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "pool_state"
+        },
+        {
+          "name": "user_stake",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool_state"
+              },
+              {
+                "kind": "account",
+                "path": "user_stake.owner",
+                "account": "UserStake"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "day",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "claim_airdrop",
+      "docs": [
+        "Claim airdrop via merkle proof. Tokens are auto-staked.",
+        "Creates a permanent ClaimMarker (prevents re-claims) and a UserStake (closed on unstake)."
+      ],
+      "discriminator": [
+        137,
+        50,
+        122,
+        111,
+        89,
+        254,
+        8,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool_state",
+          "writable": true
+        },
+        {
+          "name": "claim_marker",
+          "docs": [
+            "Permanent marker that prevents re-claiming (tiny, ~0.001 SOL)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109,
+                  101,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool_state"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_stake",
+          "docs": [
+            "Stake data, closed on unstake (user recovers rent)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool_state"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "proof",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "close_pool",
+      "docs": [
+        "Close pool state and token accounts, return rent to admin.",
+        "Only allowed after pool is terminated AND all users have unstaked."
+      ],
+      "discriminator": [
+        140,
+        189,
+        209,
+        23,
+        239,
+        62,
+        239,
+        11
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool_state",
+          "writable": true
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize_pool",
+      "docs": [
+        "Initialize pool with merkle root and pre-computed daily rewards."
+      ],
       "discriminator": [
         95,
         180,
@@ -27,14 +276,60 @@
         },
         {
           "name": "pool_state",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
         },
         {
           "name": "token_mint"
         },
         {
           "name": "pool_token_account",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool_state"
+              }
+            ]
+          }
         },
         {
           "name": "system_program",
@@ -75,21 +370,24 @@
       ]
     },
     {
-      "name": "claim_airdrop",
+      "name": "recover_expired_tokens",
+      "docs": [
+        "After exit window, admin can recover unclaimed rewards (not user principal).",
+        "User principal remains protected - users can still unstake after this."
+      ],
       "discriminator": [
-        137,
-        50,
-        122,
-        111,
-        89,
-        254,
-        8,
-        20
+        39,
+        46,
+        194,
+        145,
+        198,
+        209,
+        250,
+        233
       ],
       "accounts": [
         {
-          "name": "user",
-          "writable": true,
+          "name": "admin",
           "signer": true
         },
         {
@@ -97,38 +395,27 @@
           "writable": true
         },
         {
-          "name": "claim_marker",
+          "name": "pool_token_account",
           "writable": true
         },
         {
-          "name": "user_stake",
+          "name": "admin_token_account",
           "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
-        },
-        {
-          "name": "proof",
-          "type": {
-            "vec": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        }
-      ]
+      "args": []
     },
     {
       "name": "snapshot",
+      "docs": [
+        "Admin calls snapshot once daily (any time during the day).",
+        "Records total_staked for the current day.",
+        "Claims/unstakes are blocked until the previous day's snapshot is taken."
+      ],
       "discriminator": [
         144,
         236,
@@ -152,48 +439,10 @@
       "args": []
     },
     {
-      "name": "unstake",
-      "discriminator": [
-        90,
-        95,
-        107,
-        42,
-        205,
-        124,
-        50,
-        225
-      ],
-      "accounts": [
-        {
-          "name": "user",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "pool_state",
-          "writable": true
-        },
-        {
-          "name": "user_stake",
-          "writable": true
-        },
-        {
-          "name": "pool_token_account",
-          "writable": true
-        },
-        {
-          "name": "user_token_account",
-          "writable": true
-        },
-        {
-          "name": "token_program",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "terminate_pool",
+      "docs": [
+        "Admin terminates pool. Caps rewards, returns surplus to admin."
+      ],
       "discriminator": [
         148,
         152,
@@ -229,47 +478,25 @@
       "args": []
     },
     {
-      "name": "calculate_rewards",
+      "name": "unstake",
+      "docs": [
+        "Unstake: permanent exit. Sends principal + all accumulated rewards.",
+        "Blocked if previous day's snapshot hasn't been taken yet.",
+        "Closes the UserStake account and returns rent to user."
+      ],
       "discriminator": [
-        199,
-        115,
-        201,
+        90,
+        95,
+        107,
+        42,
+        205,
         124,
-        71,
-        81,
-        143,
-        252
+        50,
+        225
       ],
       "accounts": [
         {
-          "name": "pool_state"
-        },
-        {
-          "name": "user_stake"
-        }
-      ],
-      "args": [
-        {
-          "name": "day",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "close_pool",
-      "discriminator": [
-        140,
-        189,
-        209,
-        23,
-        239,
-        62,
-        239,
-        11
-      ],
-      "accounts": [
-        {
-          "name": "admin",
+          "name": "user",
           "writable": true,
           "signer": true
         },
@@ -278,7 +505,42 @@
           "writable": true
         },
         {
+          "name": "user_stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool_state"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
           "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "user_token_account",
           "writable": true
         },
         {
@@ -330,91 +592,203 @@
       ]
     }
   ],
+  "events": [
+    {
+      "name": "AirdropClaimed",
+      "discriminator": [
+        125,
+        251,
+        195,
+        183,
+        202,
+        126,
+        89,
+        68
+      ]
+    },
+    {
+      "name": "PoolClosed",
+      "discriminator": [
+        106,
+        46,
+        29,
+        231,
+        42,
+        44,
+        73,
+        119
+      ]
+    },
+    {
+      "name": "PoolInitialized",
+      "discriminator": [
+        100,
+        118,
+        173,
+        87,
+        12,
+        198,
+        254,
+        229
+      ]
+    },
+    {
+      "name": "PoolTerminated",
+      "discriminator": [
+        201,
+        228,
+        71,
+        56,
+        128,
+        0,
+        210,
+        109
+      ]
+    },
+    {
+      "name": "SnapshotTaken",
+      "discriminator": [
+        113,
+        204,
+        151,
+        224,
+        2,
+        128,
+        237,
+        207
+      ]
+    },
+    {
+      "name": "TokensRecovered",
+      "discriminator": [
+        210,
+        0,
+        202,
+        57,
+        138,
+        157,
+        5,
+        85
+      ]
+    },
+    {
+      "name": "Unstaked",
+      "discriminator": [
+        27,
+        179,
+        156,
+        215,
+        47,
+        71,
+        195,
+        7
+      ]
+    }
+  ],
   "errors": [
     {
       "code": 6000,
-      "name": "ProgramEnded",
-      "msg": "Program has ended"
-    },
-    {
-      "code": 6001,
       "name": "AirdropPoolExhausted",
       "msg": "Airdrop pool exhausted"
     },
     {
-      "code": 6002,
+      "code": 6001,
       "name": "NothingStaked",
       "msg": "Nothing staked"
     },
     {
-      "code": 6003,
+      "code": 6002,
       "name": "Unauthorized",
       "msg": "Unauthorized"
     },
     {
-      "code": 6004,
+      "code": 6003,
       "name": "InvalidMerkleProof",
       "msg": "Invalid merkle proof"
     },
     {
-      "code": 6005,
+      "code": 6004,
       "name": "PoolTerminated",
       "msg": "Pool has been terminated"
     },
     {
-      "code": 6006,
+      "code": 6005,
       "name": "AlreadyTerminated",
       "msg": "Pool is already terminated"
     },
     {
-      "code": 6007,
-      "name": "AllSnapshotsTaken",
-      "msg": "All 20 snapshots have been taken"
-    },
-    {
-      "code": 6008,
-      "name": "SnapshotTooEarly",
-      "msg": "Snapshot too early - day not yet elapsed"
-    },
-    {
-      "code": 6009,
-      "name": "OutsideSnapshotWindow",
-      "msg": "Outside snapshot window (12:00-12:05 AM UTC)"
-    },
-    {
-      "code": 6010,
-      "name": "UnstakeBlockedDuringSnapshot",
-      "msg": "Unstaking blocked during snapshot window (12:00-12:05 AM UTC)"
-    },
-    {
-      "code": 6011,
+      "code": 6006,
       "name": "InvalidDay",
       "msg": "Invalid day"
     },
     {
-      "code": 6012,
-      "name": "ClaimBlockedDuringSnapshot",
-      "msg": "Claims blocked during snapshot window (12:00-12:05 AM UTC)"
+      "code": 6007,
+      "name": "SnapshotTooEarly",
+      "msg": "Snapshot too early - day not yet elapsed"
     },
     {
-      "code": 6013,
+      "code": 6008,
+      "name": "SnapshotRequiredFirst",
+      "msg": "Today's snapshot must be taken before claims/unstakes"
+    },
+    {
+      "code": 6009,
       "name": "InvalidDailyRewards",
       "msg": "Daily rewards must sum to exactly STAKING_POOL"
     },
     {
-      "code": 6014,
+      "code": 6010,
       "name": "PoolNotTerminated",
       "msg": "Pool must be terminated before closing"
     },
     {
-      "code": 6015,
+      "code": 6011,
       "name": "PoolNotEmpty",
       "msg": "Pool still has staked funds - all users must unstake first"
+    },
+    {
+      "code": 6012,
+      "name": "ExitWindowNotFinished",
+      "msg": "Exit window not finished - must wait until day 35"
+    },
+    {
+      "code": 6013,
+      "name": "NothingToRecover",
+      "msg": "No tokens to recover"
+    },
+    {
+      "code": 6014,
+      "name": "SnapshotAlreadyExists",
+      "msg": "Snapshot already exists for this day"
     }
   ],
   "types": [
     {
+      "name": "AirdropClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "claim_day",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "ClaimMarker",
+      "docs": [
+        "Permanent marker that prevents re-claiming after unstake.",
+        "Tiny account (~0.001 SOL rent) that stays forever."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -426,7 +800,46 @@
       }
     },
     {
+      "name": "PoolClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "lamports_returned",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "PoolState",
+      "docs": [
+        "Pool state using zero_copy to avoid stack overflow."
+      ],
+      "serialization": "bytemuckunsafe",
+      "repr": {
+        "kind": "c"
+      },
       "type": {
         "kind": "struct",
         "fields": [
@@ -510,7 +923,70 @@
       }
     },
     {
+      "name": "PoolTerminated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "drained_amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SnapshotTaken",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "day",
+            "type": "u64"
+          },
+          {
+            "name": "total_staked",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokensRecovered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Unstaked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "principal",
+            "type": "u64"
+          },
+          {
+            "name": "rewards",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "UserStake",
+      "docs": [
+        "User stake data. Created on claim, closed on unstake (rent returned)."
+      ],
       "type": {
         "kind": "struct",
         "fields": [

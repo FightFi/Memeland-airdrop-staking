@@ -19,6 +19,7 @@ import { expect } from "chai";
 import pkg from "js-sha3";
 const { keccak256 } = pkg;
 
+import { computeDailyRewards, STAKING_POOL } from "../scripts/utils/rewards";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -26,7 +27,6 @@ const TOTAL_DAYS = 20;
 const SECONDS_PER_DAY = 86400;
 const TOKEN_DECIMALS = 9;
 const AIRDROP_POOL = new BN("50000000000000000"); // 50M with 9 decimals
-const STAKING_POOL = new BN("100000000000000000"); // 100M with 9 decimals
 const TOTAL_POOL = AIRDROP_POOL.add(STAKING_POOL); // 150M
 
 // ── Merkle tree helpers ────────────────────────────────────────────────────────
@@ -79,34 +79,6 @@ function getMerkleProof(layers: Buffer[][], leaf: Buffer): Buffer[] {
     idx = Math.floor(idx / 2);
   }
   return proof;
-}
-
-// ── Off-chain reward computation ─────────────────────────────────────────────
-
-function computeDailyRewards(): BN[] {
-  const K = 0.05;
-  const SCALE = 1e15; // Scale factor for precision in BigInt math
-
-  const expValues = Array.from({ length: 20 }, (_, d) => Math.exp(K * d));
-  const totalExp = expValues.reduce((a, b) => a + b, 0);
-
-  // Calculate scaled proportions (convert to integers for BigInt math)
-  const scaledProportions = expValues.map(v => BigInt(Math.round((v / totalExp) * SCALE)));
-  const totalScaled = scaledProportions.reduce((a, b) => a + b, 0n);
-
-  const stakingPool = BigInt(STAKING_POOL.toString());
-
-  // Calculate rewards: stakingPool * proportion / totalScaled
-  const rewards = scaledProportions.map(p =>
-    new BN((stakingPool * p / totalScaled).toString())
-  );
-
-  // Adjust last element so sum is exactly STAKING_POOL
-  const currentSum = rewards.reduce((a, b) => a.add(b), new BN(0));
-  const diff = STAKING_POOL.sub(currentSum);
-  rewards[19] = rewards[19].add(diff);
-
-  return rewards;
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
@@ -327,6 +299,24 @@ describe("memeland_airdrop", () => {
   // ─────────────────────────────────────────────────────────────────
 
   describe("claim_airdrop", () => {
+    // Take snapshot before claims (required by new logic)
+    before(async () => {
+      // Try to take snapshot - may fail if on day 0 (that's OK, claims are free on day 0)
+      try {
+        await program.methods
+          .snapshot()
+          .accounts({
+            admin: admin.publicKey,
+            poolState: poolStatePda,
+          })
+          .rpc();
+        console.log("    (snapshot taken before claims)");
+      } catch (err) {
+        // Day 0 or already taken - that's fine
+        console.log("    (snapshot skipped: day 0 or already taken)");
+      }
+    });
+
     it("user1 claims with valid merkle proof", async () => {
       const [userStakePda] = getUserStakePda(poolStatePda, user1.publicKey);
       const [claimMarkerPda] = getClaimMarkerPda(poolStatePda, user1.publicKey);
@@ -551,15 +541,16 @@ describe("memeland_airdrop", () => {
         const snapshotCount = data.readUInt8(8 + 160);
         expect(snapshotCount).to.be.greaterThan(0);
       } catch (err) {
-        // If outside snapshot window, that's expected
+        // May fail if still on day 0 or snapshot already taken
         const errStr = err.toString();
         if (
-          errStr.includes("OutsideSnapshotWindow") ||
-          errStr.includes("SnapshotTooEarly")
+          errStr.includes("InvalidDay") ||
+          errStr.includes("SnapshotTooEarly") ||
+          errStr.includes("SnapshotAlreadyExists")
         ) {
-          // Expected - we're not at midnight UTC
+          // Expected - we might be on day 0 still
           console.log(
-            "    (snapshot skipped: outside window or too early - expected in CI)"
+            "    (snapshot skipped: day 0 or already taken - expected in CI)"
           );
         } else {
           throw err;
@@ -603,7 +594,7 @@ describe("memeland_airdrop", () => {
         await getAccount(provider.connection, user1Ata.address)
       ).amount;
 
-      // Unstake may fail if we're in the snapshot window
+      // Unstake may fail if previous day's snapshot is missing
       try {
         await program.methods
           .unstake()
@@ -632,8 +623,8 @@ describe("memeland_airdrop", () => {
         const userStakeAccount = await provider.connection.getAccountInfo(userStakePda);
         expect(userStakeAccount).to.be.null;
       } catch (err) {
-        if (err.toString().includes("UnstakeBlockedDuringSnapshot")) {
-          console.log("    (unstake skipped: inside snapshot window)");
+        if (err.toString().includes("SnapshotRequiredFirst")) {
+          console.log("    (unstake skipped: snapshot required first)");
         } else {
           throw err;
         }
@@ -933,6 +924,25 @@ describe("memeland_airdrop", () => {
       );
       await provider.sendAndConfirm(new anchor.web3.Transaction().add(ix));
 
+      // Take snapshots for previous days (pool started 3 days ago)
+      // We're on day 3+, so we need snapshots for days 1 and 2
+      try {
+        await program.methods
+          .backfillSnapshot(new BN(1))
+          .accounts({ admin: admin.publicKey, poolState: poolState3 })
+          .rpc();
+        await program.methods
+          .backfillSnapshot(new BN(2))
+          .accounts({ admin: admin.publicKey, poolState: poolState3 })
+          .rpc();
+        await program.methods
+          .backfillSnapshot(new BN(3))
+          .accounts({ admin: admin.publicKey, poolState: poolState3 })
+          .rpc();
+      } catch {
+        // Some may fail if already taken or day not reached
+      }
+
       // Both claim
       const [stakeA] = getUserStakePda(poolState3, userA.publicKey);
       const [claimMarkerA] = getClaimMarkerPda(poolState3, userA.publicKey);
@@ -986,14 +996,14 @@ describe("memeland_airdrop", () => {
         userB.publicKey
       );
 
-      // Try to take a snapshot first (may fail due to time window)
+      // Try to take a snapshot first (may fail if still day 0)
       try {
         await program.methods
           .snapshot()
           .accounts({ admin: admin.publicKey, poolState: poolState3 })
           .rpc();
       } catch {
-        // OK if outside window
+        // OK if day 0 or already taken
       }
 
       await program.methods
