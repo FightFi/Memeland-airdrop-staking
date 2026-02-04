@@ -53,6 +53,7 @@ pub mod memeland_airdrop {
         pool.total_airdrop_claimed = 0;
         pool.snapshot_count = 0;
         pool.terminated = 0;
+        pool.paused = 0;
         pool.bump = ctx.bumps.pool_state;
         pool.pool_token_bump = ctx.bumps.pool_token_account;
 
@@ -88,6 +89,7 @@ pub mod memeland_airdrop {
         let pool = &mut ctx.accounts.pool_state.load_mut()?;
         let clock = Clock::get()?;
 
+        require!(pool.paused == 0, ErrorCode::PoolPaused);
         require!(pool.terminated == 0, ErrorCode::PoolTerminated);
 
         // Determine which day the user is claiming on
@@ -152,6 +154,7 @@ pub mod memeland_airdrop {
         let pool = &mut ctx.accounts.pool_state.load_mut()?;
         let clock = Clock::get()?;
 
+        require!(pool.paused == 0, ErrorCode::PoolPaused);
         require!(pool.terminated == 0, ErrorCode::PoolTerminated);
 
         // Check we are on a valid day (1-20)
@@ -194,7 +197,8 @@ pub mod memeland_airdrop {
         let pool = &mut ctx.accounts.pool_state.load_mut()?;
         let clock = Clock::get()?;
 
-        // Must not be terminated
+        // Must not be paused or terminated
+        require!(pool.paused == 0, ErrorCode::PoolPaused);
         require!(pool.terminated == 0, ErrorCode::PoolTerminated);
 
         // Day must be valid (1-20)
@@ -487,6 +491,41 @@ pub mod memeland_airdrop {
         );
         Ok(())
     }
+
+    /// Emergency pause - blocks claims and snapshots.
+    /// Users can still unstake to protect their funds.
+    pub fn pause_pool(ctx: Context<PausePool>) -> Result<()> {
+        let pool = &mut ctx.accounts.pool_state.load_mut()?;
+
+        require!(pool.paused == 0, ErrorCode::AlreadyPaused);
+        require!(pool.terminated == 0, ErrorCode::PoolTerminated);
+
+        pool.paused = 1;
+
+        emit!(PoolPausedEvent {
+            admin: ctx.accounts.admin.key(),
+        });
+
+        msg!("Pool paused by admin: {}", ctx.accounts.admin.key());
+        Ok(())
+    }
+
+    /// Unpause pool - resumes normal operations.
+    pub fn unpause_pool(ctx: Context<PausePool>) -> Result<()> {
+        let pool = &mut ctx.accounts.pool_state.load_mut()?;
+
+        require!(pool.paused == 1, ErrorCode::PoolNotPaused);
+        require!(pool.terminated == 0, ErrorCode::PoolTerminated);
+
+        pool.paused = 0;
+
+        emit!(PoolUnpausedEvent {
+            admin: ctx.accounts.admin.key(),
+        });
+
+        msg!("Pool unpaused by admin: {}", ctx.accounts.admin.key());
+        Ok(())
+    }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -765,6 +804,18 @@ pub struct RecoverExpiredTokens<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+#[derive(Accounts)]
+pub struct PausePool<'info> {
+    /// Must be the pool admin to pause/unpause
+    #[account(
+        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::UnauthorizedAdmin,
+    )]
+    pub admin: Signer<'info>,
+
+    #[account(mut)]
+    pub pool_state: AccountLoader<'info, PoolState>,
+}
+
 
 // ── State ──────────────────────────────────────────────────────────────────────
 
@@ -783,7 +834,8 @@ pub struct PoolState {
     pub terminated: u8,                   // 1
     pub bump: u8,                         // 1
     pub pool_token_bump: u8,              // 1
-    pub _padding: [u8; 4],                // 4  (align to 8 bytes)
+    pub paused: u8,                       // 1  (0 = active, 1 = paused)
+    pub _padding: [u8; 3],                // 3  (align to 8 bytes)
     pub daily_rewards: [u64; 32],         // 256 (only 0..20 used)
     pub daily_snapshots: [u64; 32],       // 256 (only 0..20 used)
 }                                         // Total: 672
@@ -850,6 +902,16 @@ pub struct PoolClosed {
     pub lamports_returned: u64,
 }
 
+#[event]
+pub struct PoolPausedEvent {
+    pub admin: Pubkey,
+}
+
+#[event]
+pub struct PoolUnpausedEvent {
+    pub admin: Pubkey,
+}
+
 // ── Errors ─────────────────────────────────────────────────────────────────────
 
 #[error_code]
@@ -867,6 +929,12 @@ pub enum ErrorCode {
     PoolNotEmpty,
     #[msg("Daily rewards must sum to exactly STAKING_POOL (100M tokens)")]
     InvalidDailyRewards,
+    #[msg("Pool is paused - operations temporarily disabled")]
+    PoolPaused,
+    #[msg("Pool is not paused - cannot unpause")]
+    PoolNotPaused,
+    #[msg("Pool is already paused")]
+    AlreadyPaused,
 
     // ── Stake Errors ───────────────────────────────────────────────────────────
     #[msg("Nothing staked - user has no active stake")]
