@@ -10,3 +10,4 @@ keypairs/
 .env.prod
 .env.local
 .claude/
+.env

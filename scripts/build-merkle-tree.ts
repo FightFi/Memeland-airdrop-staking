@@ -156,6 +156,7 @@ function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
     console.error("Usage: npx ts-node scripts/build-merkle-tree.ts <input.csv> [output.json]");
+    console.error("Example: npx ts-node scripts/build-merkle-tree.ts data/devnet-airdrop.csv data/devnet-airdrop-merkle.json");
     process.exit(1);
   }
 

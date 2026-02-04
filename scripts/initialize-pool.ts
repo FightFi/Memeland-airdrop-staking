@@ -19,7 +19,7 @@
  *
  * What this script does:
  *   1. Reads merkle root from the merkle JSON file
- *   2. Calls initialize_pool(start_time, merkle_root)
+ *   2. Calls initialize_pool(start_time, merkle_root, daily_rewards)
  *   3. Transfers 150M tokens from admin ATA to the pool token account
  */
 

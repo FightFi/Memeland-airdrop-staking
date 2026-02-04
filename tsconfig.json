@@ -1,10 +1,12 @@
 {
   "compilerOptions": {
-    "types": ["mocha", "chai"],
-    "typeRoots": ["./node_modules/@types"],
-    "lib": ["es2015"],
+    "target": "ES2020",          // Necesario para BigInt
     "module": "commonjs",
-    "target": "es6",
-    "esModuleInterop": true
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["node"],           // <<<<<< Incluye los tipos de Node
+    "lib": ["es2020", "dom"]    // Para BigInt y console
   }
 }
