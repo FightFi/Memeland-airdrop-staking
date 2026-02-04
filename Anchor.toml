@@ -7,13 +7,13 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-memeland_airdrop = "Abp5pKfeUysdsxZULSDSRxkG2v66gLPn6c1Yu1Zuk9jT"
+memeland_airdrop = "4y6rh1SKMAGvunes2gHCeJkEkmPVDLhWYxNg8Zpd7RqH"
 
 [programs.devnet]
-memeland_airdrop = "Abp5pKfeUysdsxZULSDSRxkG2v66gLPn6c1Yu1Zuk9jT"
+memeland_airdrop = "4y6rh1SKMAGvunes2gHCeJkEkmPVDLhWYxNg8Zpd7RqH"
 
 [programs.mainnet]
-memeland_airdrop = "Abp5pKfeUysdsxZULSDSRxkG2v66gLPn6c1Yu1Zuk9jT"
+memeland_airdrop = "4y6rh1SKMAGvunes2gHCeJkEkmPVDLhWYxNg8Zpd7RqH"
 
 [registry]
 url = "https://api.apr.dev"
