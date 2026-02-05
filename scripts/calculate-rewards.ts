@@ -241,7 +241,7 @@ async function main() {
   console.log("=== Reward Calculator ===");
   console.log(`Address:        ${userPubkey.toBase58()}`);
   console.log(`Staked Amount:  ${formatTokens(userStake.stakedAmount)} tokens`);
-  console.log(`Claim Day:      ${userStake.claimDay + 1}`);
+  console.log(`Claim Day:      ${userStake.claimDay}`);
   console.log(`Current Day:    ${currentDay}`);
   console.log(`Snapshots:      ${pool.snapshotCount}`);
   console.log();
