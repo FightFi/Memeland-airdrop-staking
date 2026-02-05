@@ -29,7 +29,9 @@
     "stats:devnet:json": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --json",
     "stats:prod:json": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --json",
     "stats:devnet:json:save": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --json --save",
-    "stats:prod:json:save": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --json --save"
+    "stats:prod:json:save": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --json --save",
+    "rewards:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/calculate-rewards.ts",
+    "rewards:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/calculate-rewards.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.31.0",
