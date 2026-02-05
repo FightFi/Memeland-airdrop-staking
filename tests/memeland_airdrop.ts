@@ -306,9 +306,10 @@ describe("memeland_airdrop", () => {
         await program.methods
           .snapshot()
           .accounts({
-            admin: admin.publicKey,
+            signer: user1.publicKey,
             poolState: poolStatePda,
           })
+          .signers([user1])
           .rpc();
         console.log("    (snapshot taken before claims)");
       } catch (err) {
@@ -529,9 +530,10 @@ describe("memeland_airdrop", () => {
         await program.methods
           .snapshot()
           .accounts({
-            admin: admin.publicKey,
+            signer: user1.publicKey,
             poolState: poolStatePda,
           })
+          .signers([user1])
           .rpc();
 
         // If it succeeded, verify the snapshot was recorded
@@ -558,20 +560,20 @@ describe("memeland_airdrop", () => {
       }
     });
 
-    it("non-admin cannot take snapshot", async () => {
+    it("non-admin can take snapshot", async () => {
+      // Snapshot is permissionless - anyone can call it
       try {
         await program.methods
           .snapshot()
           .accounts({
-            admin: user1.publicKey,
+            signer: user1.publicKey,
             poolState: poolStatePda,
           })
           .signers([user1])
           .rpc();
-        expect.fail("Should have thrown");
       } catch (err) {
-        // Should fail with Unauthorized or constraint violation
-        expect(err.toString()).to.include("nauthorized");
+        // May fail with SnapshotAlreadyExists if already taken, that's OK
+        expect(err.toString()).to.include("SnapshotAlreadyExists");
       }
     });
   });
@@ -930,14 +932,17 @@ describe("memeland_airdrop", () => {
         await program.methods
           .backfillSnapshot(new BN(1))
           .accounts({ admin: admin.publicKey, poolState: poolState3 })
+          .signers([admin])
           .rpc();
         await program.methods
           .backfillSnapshot(new BN(2))
           .accounts({ admin: admin.publicKey, poolState: poolState3 })
+          .signers([admin])
           .rpc();
         await program.methods
           .backfillSnapshot(new BN(3))
           .accounts({ admin: admin.publicKey, poolState: poolState3 })
+          .signers([admin])
           .rpc();
       } catch {
         // Some may fail if already taken or day not reached
@@ -1000,7 +1005,8 @@ describe("memeland_airdrop", () => {
       try {
         await program.methods
           .snapshot()
-          .accounts({ admin: admin.publicKey, poolState: poolState3 })
+          .accounts({ signer: user1.publicKey, poolState: poolState3 })
+          .signers([user1])
           .rpc();
       } catch {
         // OK if day 0 or already taken
@@ -1429,6 +1435,7 @@ describe("memeland_airdrop", () => {
           await program.methods
             .backfillSnapshot(new BN(d))
             .accounts({ admin: admin.publicKey, poolState: poolState6 })
+            .signers([admin])
             .rpc();
         } catch {
           // May already exist
@@ -1697,11 +1704,13 @@ describe("memeland_airdrop", () => {
       await program.methods
         .backfillSnapshot(new BN(1))
         .accounts({ admin: admin.publicKey, poolState: poolState9 })
+        .signers([admin])
         .rpc();
 
       await program.methods
         .backfillSnapshot(new BN(2))
         .accounts({ admin: admin.publicKey, poolState: poolState9 })
+        .signers([admin])
         .rpc();
 
       // Verify snapshots were recorded
@@ -1717,6 +1726,7 @@ describe("memeland_airdrop", () => {
         await program.methods
           .backfillSnapshot(new BN(10))
           .accounts({ admin: admin.publicKey, poolState: poolState9 })
+          .signers([admin])
           .rpc();
         expect.fail("Should have thrown");
       } catch (err) {
@@ -1742,6 +1752,7 @@ describe("memeland_airdrop", () => {
           await program.methods
             .backfillSnapshot(new BN(1))
             .accounts({ admin: admin.publicKey, poolState: poolState9 })
+            .signers([admin])
             .rpc();
           expect.fail("Should have thrown");
         } catch (err) {
@@ -1757,6 +1768,7 @@ describe("memeland_airdrop", () => {
         await program.methods
           .backfillSnapshot(new BN(1))
           .accounts({ admin: admin.publicKey, poolState: poolState9 })
+          .signers([admin])
           .rpc();
 
         // This is the expected behavior - passes without error
@@ -1769,6 +1781,7 @@ describe("memeland_airdrop", () => {
         await program.methods
           .backfillSnapshot(new BN(0))
           .accounts({ admin: admin.publicKey, poolState: poolState9 })
+          .signers([admin])
           .rpc();
         expect.fail("Should have thrown");
       } catch (err) {
@@ -1781,6 +1794,7 @@ describe("memeland_airdrop", () => {
         await program.methods
           .backfillSnapshot(new BN(21))
           .accounts({ admin: admin.publicKey, poolState: poolState9 })
+          .signers([admin])
           .rpc();
         expect.fail("Should have thrown");
       } catch (err) {
@@ -1799,7 +1813,7 @@ describe("memeland_airdrop", () => {
           .rpc();
         expect.fail("Should have thrown");
       } catch (err) {
-        expect(err.toString()).to.include("nauthorized");
+        expect(err.toString()).to.include("UnauthorizedAdmin");
       }
     });
   });
@@ -2121,10 +2135,12 @@ describe("memeland_airdrop", () => {
       await program.methods
         .backfillSnapshot(new BN(1))
         .accounts({ admin: admin.publicKey, poolState: poolState13 })
+        .signers([admin])
         .rpc();
       await program.methods
         .backfillSnapshot(new BN(2))
         .accounts({ admin: admin.publicKey, poolState: poolState13 })
+        .signers([admin])
         .rpc();
 
       const [stakeSnap] = getUserStakePda(poolState13, userSnap.publicKey);
@@ -2343,6 +2359,7 @@ describe("memeland_airdrop", () => {
       await program.methods
         .backfillSnapshot(new BN(1))
         .accounts({ admin: admin.publicKey, poolState: poolState15 })
+        .signers([admin])
         .rpc();
 
       const poolAccount = await provider.connection.getAccountInfo(poolState15);
@@ -2393,7 +2410,8 @@ describe("memeland_airdrop", () => {
       try {
         await program.methods
           .snapshot()
-          .accounts({ admin: admin.publicKey, poolState: poolState15 })
+          .accounts({ signer: user1.publicKey, poolState: poolState15 })
+          .signers([user1])
           .rpc();
       } catch {
         // May fail if day already snapshotted
@@ -2786,8 +2804,10 @@ describe("memeland_airdrop", () => {
         await program.methods
           .snapshot()
           .accounts({
+            signer: user1.publicKey,
             poolState: poolState17,
           })
+          .signers([user1])
           .rpc();
         expect.fail("Should have thrown");
       } catch (err) {
@@ -2803,6 +2823,7 @@ describe("memeland_airdrop", () => {
             admin: admin.publicKey,
             poolState: poolState17,
           })
+          .signers([admin])
           .rpc();
         expect.fail("Should have thrown");
       } catch (err) {

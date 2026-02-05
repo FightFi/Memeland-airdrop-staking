@@ -208,7 +208,7 @@ async function main() {
         tx = await program.methods
           .snapshot()
           .accounts({
-            admin: admin.publicKey,
+            signer: admin.publicKey,
             poolState,
           })
           .rpc();
@@ -217,7 +217,7 @@ async function main() {
         tx = await program.methods
           .backfillSnapshot(new BN(day))
           .accounts({
-            admin: admin.publicKey,
+            signer: admin.publicKey,
             poolState,
           })
           .rpc();

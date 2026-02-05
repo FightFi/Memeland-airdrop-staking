@@ -10,7 +10,7 @@
     {
       "name": "backfill_snapshot",
       "docs": [
-        "Admin can backfill snapshots for missed days.",
+        "Admin-only backfill for missed snapshots.",
         "Only for emergencies when regular snapshot() failed.",
         "Cannot overwrite existing snapshots."
       ],
@@ -28,7 +28,7 @@
         {
           "name": "admin",
           "docs": [
-            "Must be the pool admin to take snapshots"
+            "Must be the pool admin to backfill snapshots"
           ],
           "signer": true
         },
@@ -468,7 +468,7 @@
     {
       "name": "snapshot",
       "docs": [
-        "Admin calls snapshot once daily (any time during the day).",
+        "Anyone can call snapshot once daily (any time during the day).",
         "Records total_staked for the current day.",
         "Claims/unstakes are blocked until the previous day's snapshot is taken."
       ],
@@ -484,10 +484,7 @@
       ],
       "accounts": [
         {
-          "name": "admin",
-          "docs": [
-            "Must be the pool admin to take snapshots"
-          ],
+          "name": "signer",
           "signer": true
         },
         {

@@ -147,7 +147,7 @@ pub mod memeland_airdrop {
         Ok(())
     }
 
-    /// Admin calls snapshot once daily (any time during the day).
+    /// Anyone can call snapshot once daily (any time during the day).
     /// Records total_staked for the current day.
     /// Claims/unstakes are blocked until the previous day's snapshot is taken.
     pub fn snapshot(ctx: Context<Snapshot>) -> Result<()> {
@@ -190,10 +190,10 @@ pub mod memeland_airdrop {
         Ok(())
     }
 
-    /// Admin can backfill snapshots for missed days.
+    /// Admin-only backfill for missed snapshots.
     /// Only for emergencies when regular snapshot() failed.
     /// Cannot overwrite existing snapshots.
-    pub fn backfill_snapshot(ctx: Context<Snapshot>, day: u64) -> Result<()> {
+    pub fn backfill_snapshot(ctx: Context<BackfillSnapshot>, day: u64) -> Result<()> {
         let pool = &mut ctx.accounts.pool_state.load_mut()?;
         let clock = Clock::get()?;
 
@@ -666,7 +666,15 @@ pub struct ClaimAirdrop<'info> {
 
 #[derive(Accounts)]
 pub struct Snapshot<'info> {
-    /// Must be the pool admin to take snapshots
+    pub signer: Signer<'info>,
+
+    #[account(mut)]
+    pub pool_state: AccountLoader<'info, PoolState>,
+}
+
+#[derive(Accounts)]
+pub struct BackfillSnapshot<'info> {
+    /// Must be the pool admin to backfill snapshots
     #[account(
         constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::UnauthorizedAdmin,
     )]
