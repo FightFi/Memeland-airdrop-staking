@@ -553,7 +553,7 @@ fn calculate_user_rewards(
 ) -> u64 {
     let mut total_rewards: u128 = 0;
 
-    let start = claim_day.saturating_sub(1) as usize;
+    let start = claim_day as usize;
 
     for d in start..(snapshot_count as usize) {
         let snapshot_total = daily_snapshots[d];
