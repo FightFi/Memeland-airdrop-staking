@@ -91,6 +91,10 @@ pub mod memeland_airdrop {
 
         require!(pool.paused == 0, ErrorCode::PoolPaused);
         require!(pool.terminated == 0, ErrorCode::PoolTerminated);
+        require!(
+            !program_expired(pool.start_time, clock.unix_timestamp),
+            ErrorCode::ProgramExpired
+        );
 
         // Determine which day the user is claiming on
         let current_day = get_current_day(pool.start_time, clock.unix_timestamp);
@@ -256,14 +260,19 @@ pub mod memeland_airdrop {
             );
         }
 
-        // Calculate accumulated rewards
-        let rewards = calculate_user_rewards(
-            user_stake.staked_amount,
-            user_stake.claim_day,
-            pool.snapshot_count,
-            &pool.daily_rewards,
-            &pool.daily_snapshots,
-        );
+        let expired = program_expired(pool.start_time, clock.unix_timestamp);
+
+        let rewards = if expired {
+            0
+        } else {
+            calculate_user_rewards(
+                    user_stake.staked_amount,
+                    user_stake.claim_day,
+                    pool.snapshot_count,
+                    &pool.daily_rewards,
+                    &pool.daily_snapshots,
+            );
+        };
 
         let total_payout = user_stake
             .staked_amount
