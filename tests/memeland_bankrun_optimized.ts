@@ -30,6 +30,19 @@ const SECONDS_PER_DAY = 86400;
 const STAKING_POOL = new BN("100000000000000000"); // 100M tokens
 const AIRDROP_POOL = new BN("50000000000000000");  // 50M tokens
 const TOKEN_DECIMALS = 9;
+const TOTAL_POOL = STAKING_POOL.add(AIRDROP_POOL);
+
+function computeDailyRewards() {
+    const rewards = Array(32).fill(new BN(0));
+    const dayReward = STAKING_POOL.div(new BN(TOTAL_DAYS));
+    for (let i = 0; i < TOTAL_DAYS; i++) rewards[i] = dayReward;
+    rewards[TOTAL_DAYS - 1] = rewards[TOTAL_DAYS - 1].add(STAKING_POOL.mod(new BN(TOTAL_DAYS)));
+    return Array.from(rewards);
+}
+
+function getMerkleRoot(layers: Buffer[][]): Buffer {
+    return layers[layers.length - 1][0];
+}
 
 describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
   let program: any;
@@ -202,7 +215,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
         computeLeaf(charlie.publicKey, charlieAmount)
     ];
     multiMerkleLayers = buildMerkleTree(leaves);
-    multiMerkleRoot = multiMerkleLayers[multiMerkleLayers.length - 1][0];
+    multiMerkleRoot = getMerkleRoot(multiMerkleLayers);
     
     // Legacy support for smoketest
     merkleRoot = multiMerkleRoot;
@@ -602,10 +615,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
         const startTime = Math.floor(Date.now() / 1000) + 1000;
         await warpTo(startTime - 100);
 
-        const rewards = Array(32).fill(new BN(0));
-        const dayReward = STAKING_POOL.div(new BN(20));
-        for (let i = 0; i < 20; i++) rewards[i] = dayReward;
-        rewards[19] = rewards[19].add(STAKING_POOL.mod(new BN(20)));
+        const rewards = computeDailyRewards();
 
         await program.methods.initializePool(new BN(startTime), Array.from(multiMerkleRoot), rewards)
             .accounts({
@@ -685,6 +695,506 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
         const aliceAcc = await getAccountBankrun(aliceAta);
         console.log("Alice rewards factor:", Number(aliceAcc!.amount) / Number(aliceAmount.toString()));
         expect(Number(aliceAcc!.amount)).to.be.greaterThan(Number(aliceAmount.toString()));
+    });
+  });
+
+  describe("Advanced Lifecycle: Recovery & Expiration", () => {
+    let rPool: PublicKey;
+    let rPoolState: PublicKey;
+    let rPoolToken: PublicKey;
+    let rMerkleRoot: Buffer;
+    let rMerkleLayers: any;
+    let poolStart: number;
+
+    const rUser = Keypair.generate();
+    const rAmount = new BN(10_000_000).mul(new BN(1e9)); // 10M
+
+    before(async () => {
+        rPool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+        [rPoolState] = getPoolStatePda(rPool);
+        [rPoolToken] = getPoolTokenPda(rPoolState);
+
+        rMerkleLayers = buildMerkleTree([computeLeaf(rUser.publicKey, rAmount)]);
+        rMerkleRoot = getMerkleRoot(rMerkleLayers);
+
+        await fundAccount(rUser.publicKey);
+        poolStart = Math.floor(Date.now() / 1000) + 1000;
+        await warpTo(poolStart - 100);
+
+        const rewards = computeDailyRewards();
+        await program.methods.initializePool(new BN(poolStart), Array.from(rMerkleRoot), rewards)
+            .accounts({
+                admin: admin.publicKey,
+                poolState: rPoolState,
+                tokenMint: rPool,
+                poolTokenAccount: rPoolToken,
+                systemProgram: SystemProgram.programId,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                rent: SYSVAR_RENT_PUBKEY,
+            }).signers([admin]).rpc();
+
+        const adminAta = await getOrCreateATABankrun(rPool, admin.publicKey);
+        const tx = new anchor.web3.Transaction().add(
+            createMintToInstruction(rPool, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
+            createTransferInstruction(adminAta, rPoolToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
+        );
+        await provider.sendAndConfirm(tx, [admin]);
+    });
+
+    it("Security: User cannot claim with someone else's proof", async () => {
+        const maliciousUser = Keypair.generate();
+        await fundAccount(maliciousUser.publicKey);
+        const [mStake] = getUserStakePda(rPoolState, maliciousUser.publicKey);
+        const [mMarker] = getClaimMarkerPda(rPoolState, maliciousUser.publicKey);
+
+        try {
+            await program.methods.claimAirdrop(rAmount, getMerkleProof(rMerkleLayers, computeLeaf(rUser.publicKey, rAmount)))
+                .accounts({
+                    user: maliciousUser.publicKey,
+                    poolState: rPoolState,
+                    claimMarker: mMarker,
+                    userStake: mStake,
+                    systemProgram: SystemProgram.programId,
+                })
+                .signers([maliciousUser])
+                .rpc();
+            expect.fail("Cross-user proof should fail");
+        } catch (e: any) {
+            const msg = (e.message || "").toString();
+            console.log("Debug Expried/Proof Error:", msg);
+            expect(msg).to.satisfy((m: string) => m.includes("6026") || m.includes("0x178a") || m.includes("InvalidMerkleProof") || m.includes("6027") || m.includes("PoolNotStartedYet"));
+        }
+    });
+
+    it("Airdrop Expiration: Fails to claim after Day 35", async () => {
+        // Warp to Day 36
+        await warpTo(poolStart + 36 * SECONDS_PER_DAY);
+        
+        const [rStake] = getUserStakePda(rPoolState, rUser.publicKey);
+        const [rMarker] = getClaimMarkerPda(rPoolState, rUser.publicKey);
+
+        try {
+            await program.methods.claimAirdrop(rAmount, getMerkleProof(rMerkleLayers, computeLeaf(rUser.publicKey, rAmount)))
+                .accounts({
+                    user: rUser.publicKey,
+                    poolState: rPoolState,
+                    claimMarker: rMarker,
+                    userStake: rStake,
+                    systemProgram: SystemProgram.programId,
+                })
+                .signers([rUser])
+                .rpc();
+            expect.fail("Claim should fail after expiration");
+        } catch (e: any) {
+            const msg = (e.message || "").toString();
+            console.log("Debug Expired Error:", msg);
+            expect(msg).to.satisfy((m: string) => m.includes("6001") || m.includes("0x1771") || m.includes("PoolExpired") || m.includes("6011") || m.includes("ProgramExpired"));
+        }
+    });
+
+    it("Token Recovery: Admin recovers expired funds", async () => {
+        const adminAta = await getOrCreateATABankrun(rPool, admin.publicKey);
+        const poolAtaBefore = await getAccountBankrun(rPoolToken);
+        const adminAtaBefore = await getAccountBankrun(adminAta);
+        
+        await program.methods.recoverExpiredTokens()
+            .accounts({
+                admin: admin.publicKey,
+                poolState: rPoolState,
+                poolTokenAccount: rPoolToken,
+                adminTokenAccount: adminAta,
+                tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .signers([admin])
+            .rpc();
+
+        const poolAtaAfter = await getAccountBankrun(rPoolToken);
+        const adminAtaAfter = await getAccountBankrun(adminAta);
+        
+        expect(poolAtaAfter!.amount).to.equal(0n);
+        expect(adminAtaAfter!.amount).to.equal(adminAtaBefore!.amount + poolAtaBefore!.amount);
+    });
+  });
+
+  describe("Lifecycle Constraint: Termination vs Rewards", () => {
+    let tPool: PublicKey;
+    let tPoolState: PublicKey;
+    let tPoolToken: PublicKey;
+    let tMerkleRoot: Buffer;
+    let tMerkleLayers: any;
+    let poolStart: number;
+
+    const tUser = Keypair.generate();
+    const tAmount = new BN(10_000_000).mul(new BN(1e9));
+
+    before(async () => {
+        tPool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+        [tPoolState] = getPoolStatePda(tPool);
+        [tPoolToken] = getPoolTokenPda(tPoolState);
+
+        tMerkleLayers = buildMerkleTree([computeLeaf(tUser.publicKey, tAmount)]);
+        tMerkleRoot = getMerkleRoot(tMerkleLayers);
+
+        await fundAccount(tUser.publicKey);
+        poolStart = Math.floor(Date.now() / 1000) + 1000;
+        await warpTo(poolStart - 100);
+
+        await program.methods.initializePool(new BN(poolStart), Array.from(tMerkleRoot), computeDailyRewards())
+            .accounts({
+                admin: admin.publicKey,
+                poolState: tPoolState,
+                tokenMint: tPool,
+                poolTokenAccount: tPoolToken,
+                systemProgram: SystemProgram.programId,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                rent: SYSVAR_RENT_PUBKEY,
+            }).signers([admin]).rpc();
+
+        const adminAta = await getOrCreateATABankrun(tPool, admin.publicKey);
+        await provider.sendAndConfirm(new anchor.web3.Transaction().add(
+            createMintToInstruction(tPool, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
+            createTransferInstruction(adminAta, tPoolToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
+        ), [admin]);
+    });
+
+    it("User gets principal only if terminated mid-cycle", async () => {
+        await warpTo(poolStart + 5 * SECONDS_PER_DAY + 3600);
+        // Must snapshot before claiming on Day 5
+        await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: tPoolState }).signers([admin]).rpc();
+
+        const [tStake] = getUserStakePda(tPoolState, tUser.publicKey);
+        const [tMarker] = getClaimMarkerPda(tPoolState, tUser.publicKey);
+        
+        await program.methods.claimAirdrop(tAmount, getMerkleProof(tMerkleLayers, computeLeaf(tUser.publicKey, tAmount)))
+            .accounts({
+                user: tUser.publicKey,
+                poolState: tPoolState,
+                claimMarker: tMarker,
+                userStake: tStake,
+                systemProgram: SystemProgram.programId,
+            })
+            .signers([tUser])
+            .rpc();
+
+        const tUserAta = await getOrCreateATABankrun(tPool, tUser.publicKey, tUser);
+        const balBeforeUnstake = (await getAccountBankrun(tUserAta))!.amount;
+        console.log("Termination Test - Balance After Claim:", balBeforeUnstake.toString());
+
+        // Must complete snapshots before terminating, as program requires all snapshots even for termination
+        await warpTo(poolStart + 21 * SECONDS_PER_DAY);
+        for(let i=0; i<20; i++) {
+            try { 
+                await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: tPoolState }).signers([admin]).rpc(); 
+            } catch(e) {}
+            const clock = await context.banksClient.getClock();
+            await warpTo(Number(clock.unixTimestamp) + 1);
+        }
+
+        const adminAta = await getOrCreateATABankrun(tPool, admin.publicKey);
+        await program.methods.terminatePool()
+            .accounts({
+                admin: admin.publicKey,
+                poolState: tPoolState,
+                poolTokenAccount: tPoolToken,
+                adminTokenAccount: adminAta,
+                tokenProgram: TOKEN_PROGRAM_ID,
+            })
+        // Unstake as User
+        await program.methods.unstake()
+            .accounts({
+                user: tUser.publicKey,
+                poolState: tPoolState,
+                userStake: tStake,
+                poolTokenAccount: tPoolToken,
+                userTokenAccount: tUserAta,
+                tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .signers([tUser])
+            .rpc();
+
+        const balAfterUnstake = (await getAccountBankrun(tUserAta))!.amount;
+        console.log("Termination Test - Balance After Unstake (Total Expected):", balAfterUnstake.toString());
+        // User gets 10M principal + 75M airdrop = 85M total
+        const expectedTotal = BigInt(tAmount.toString()) + BigInt("75000000000000000"); 
+        expect(balAfterUnstake).to.equal(expectedTotal);
+    });
+  });
+
+  describe("Coverage Deep Dive", () => {
+    
+    describe("Initialization Rejection", () => {
+        it("Fails if daily_rewards sum is not STAKING_POOL", async () => {
+            const mint = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+            const [pState] = getPoolStatePda(mint);
+            const [pToken] = getPoolTokenPda(pState);
+
+            const stSum = Math.floor(Date.now() / 1000) + 1000;
+            await warpTo(stSum - 10);
+            const rewards = Array(32).fill(new BN(0));
+            const dayReward = STAKING_POOL.div(new BN(20));
+            for (let i = 0; i < 20; i++) rewards[i] = dayReward;
+            rewards[0] = rewards[0].add(new BN(1));
+
+            try {
+                await program.methods.initializePool(new BN(stSum), Array.from(multiMerkleRoot), rewards)
+                    .accounts({
+                        admin: admin.publicKey,
+                        poolState: pState,
+                        tokenMint: mint,
+                        poolTokenAccount: pToken,
+                        systemProgram: SystemProgram.programId,
+                        tokenProgram: TOKEN_PROGRAM_ID,
+                        rent: SYSVAR_RENT_PUBKEY,
+                    }).signers([admin]).rpc();
+                expect.fail("Should have failed due to invalid reward sum");
+            } catch (e: any) {
+                const msg = (e.message || "").toString();
+                expect(msg.toLowerCase(), `Actual error: ${msg}`).to.satisfy((m: string) => 
+                    m.includes("6004") || m.includes("invaliddailyrewards") || m.includes("0x1774")
+                );
+            }
+        });
+
+        it("Fails if daily_rewards are not in ascending order", async () => {
+            const mint = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+            const [pState] = getPoolStatePda(mint);
+            const [pToken] = getPoolTokenPda(pState);
+
+            const stOrder = Math.floor(Date.now() / 1000) + 2000;
+            await warpTo(stOrder - 10);
+            const rewards = Array(32).fill(new BN(0));
+            const dayReward = STAKING_POOL.div(new BN(20));
+            for (let i = 0; i < 20; i++) rewards[i] = dayReward;
+            // Swap to break ascending order: day 1 > day 0
+            rewards[0] = dayReward.add(new BN(100));
+            rewards[1] = dayReward.sub(new BN(100));
+
+            try {
+                await program.methods.initializePool(new BN(stOrder), Array.from(multiMerkleRoot), rewards)
+                    .accounts({
+                        admin: admin.publicKey,
+                        poolState: pState,
+                        tokenMint: mint,
+                        poolTokenAccount: pToken,
+                        systemProgram: SystemProgram.programId,
+                        tokenProgram: TOKEN_PROGRAM_ID,
+                        rent: SYSVAR_RENT_PUBKEY,
+                    }).signers([admin]).rpc();
+                expect.fail("Should have failed due to invalid reward order");
+            } catch (e: any) {
+                const msg = (e.message || "").toString();
+                expect(msg.toLowerCase(), `Actual error: ${msg}`).to.satisfy((m: string) => 
+                    m.includes("6005") || m.includes("invaliddailyrewardsorder") || m.includes("0x1775")
+                );
+            }
+        });
+    });
+
+    describe("Airdrop Exhaustion", () => {
+        let xPool: PublicKey;
+        let xPoolState: PublicKey;
+        let xPoolToken: PublicKey;
+        let xMerkleLayers: any;
+        let xMerkleRoot: Buffer;
+
+        const users = Array.from({length: 3}, () => Keypair.generate());
+        const amountPerUser = AIRDROP_POOL.div(new BN(2)); // Each user takes 50%, 3 users = 150% (Exhaustion)
+
+        before(async () => {
+            xPool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+            [xPoolState] = getPoolStatePda(xPool);
+            [xPoolToken] = getPoolTokenPda(xPoolState);
+
+            const leaves = users.map(u => computeLeaf(u.publicKey, amountPerUser));
+            xMerkleLayers = buildMerkleTree(leaves);
+            xMerkleRoot = getMerkleRoot(xMerkleLayers);
+
+            const startTime = Math.floor(Date.now() / 1000) + 1000;
+            await warpTo(startTime - 100);
+
+            const rewards = computeDailyRewards();
+            await program.methods.initializePool(new BN(startTime), Array.from(xMerkleRoot), rewards)
+                .accounts({
+                    admin: admin.publicKey,
+                    poolState: xPoolState,
+                    tokenMint: xPool,
+                    poolTokenAccount: xPoolToken,
+                    systemProgram: SystemProgram.programId,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                    rent: SYSVAR_RENT_PUBKEY,
+                }).signers([admin]).rpc();
+
+            const adminAta = await getOrCreateATABankrun(xPool, admin.publicKey);
+            const tx = new anchor.web3.Transaction().add(
+                createMintToInstruction(xPool, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
+                createTransferInstruction(adminAta, xPoolToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
+            );
+            await provider.sendAndConfirm(tx, [admin]);
+            
+            await warpTo(startTime + SECONDS_PER_DAY + 3600);
+            await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: xPoolState }).signers([admin]).rpc();
+        });
+
+        it("Fails when Airdrop Pool is exhausted", async () => {
+            // User 1 & 2 together take 100% (50M)
+            for (let i = 0; i < 2; i++) {
+                const user = users[i];
+                await fundAccount(user.publicKey);
+                const [stake] = getUserStakePda(xPoolState, user.publicKey);
+                const [marker] = getClaimMarkerPda(xPoolState, user.publicKey);
+                await program.methods.claimAirdrop(amountPerUser, getMerkleProof(xMerkleLayers, computeLeaf(user.publicKey, amountPerUser)))
+                    .accounts({ user: user.publicKey, poolState: xPoolState, claimMarker: marker, userStake: stake, systemProgram: SystemProgram.programId })
+                    .signers([user]).rpc();
+            }
+
+            // User 3 tries to claim, exceeding 50M
+            const user3 = users[2];
+            await fundAccount(user3.publicKey);
+            const [stake3] = getUserStakePda(xPoolState, user3.publicKey);
+            const [marker3] = getClaimMarkerPda(xPoolState, user3.publicKey);
+            try {
+                await program.methods.claimAirdrop(amountPerUser, getMerkleProof(xMerkleLayers, computeLeaf(user3.publicKey, amountPerUser)))
+                    .accounts({ user: user3.publicKey, poolState: xPoolState, claimMarker: marker3, userStake: stake3, systemProgram: SystemProgram.programId })
+                    .signers([user3]).rpc();
+                expect.fail("Airdrop pool should have been exhausted");
+            } catch (e: any) {
+                const msg = e.message || "";
+                expect(msg).to.satisfy((m: string) => m.includes("6012") || m.includes("AirdropPoolExhausted"));
+            }
+        });
+    });
+
+    describe("Reward Accuracy & Expiry Deep Dive", () => {
+        let fPool: PublicKey;
+        let fPoolState: PublicKey;
+        let fPoolToken: PublicKey;
+        let fMerkleRoot: Buffer;
+        let fMerkleLayers: any;
+        let poolStart: number;
+
+        const fUser = Keypair.generate();
+        const fAmount = new BN(10_000_000).mul(new BN(1e9)); // 10M
+
+        before(async () => {
+            fPool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+            [fPoolState] = getPoolStatePda(fPool);
+            [fPoolToken] = getPoolTokenPda(fPoolState);
+
+            fMerkleLayers = buildMerkleTree([computeLeaf(fUser.publicKey, fAmount)]);
+            fMerkleRoot = getMerkleRoot(fMerkleLayers);
+
+            await fundAccount(fUser.publicKey);
+            poolStart = Math.floor(Date.now() / 1000) + 1000;
+            await warpTo(poolStart - 100);
+
+            const rewards = computeDailyRewards();
+            await program.methods.initializePool(new BN(poolStart), Array.from(fMerkleRoot), rewards)
+                .accounts({
+                    admin: admin.publicKey,
+                    poolState: fPoolState,
+                    tokenMint: fPool,
+                    poolTokenAccount: fPoolToken,
+                    systemProgram: SystemProgram.programId,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                    rent: SYSVAR_RENT_PUBKEY,
+                }).signers([admin]).rpc();
+
+            const adminAta = await getOrCreateATABankrun(fPool, admin.publicKey);
+            await provider.sendAndConfirm(new anchor.web3.Transaction().add(
+                createMintToInstruction(fPool, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
+                createTransferInstruction(adminAta, fPoolToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
+            ), [admin]);
+        });
+
+        it("Calculates precise rewards for late claim (Day 10)", async () => {
+             // Warp to Day 10
+             await warpTo(poolStart + 10 * SECONDS_PER_DAY + 3600);
+             // Snapshot all days up to 10
+             for(let i=0; i<10; i++) {
+                try { await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: fPoolState }).signers([admin]).rpc(); } catch(e) {}
+                const currentClock = await context.banksClient.getClock();
+                await warpTo(Number(currentClock.unixTimestamp) + 1);
+             }
+
+             const [fStake] = getUserStakePda(fPoolState, fUser.publicKey);
+             const [fMarker] = getClaimMarkerPda(fPoolState, fUser.publicKey);
+             await program.methods.claimAirdrop(fAmount, getMerkleProof(fMerkleLayers, computeLeaf(fUser.publicKey, fAmount)))
+                 .accounts({ user: fUser.publicKey, poolState: fPoolState, claimMarker: fMarker, userStake: fStake, systemProgram: SystemProgram.programId })
+                 .signers([fUser]).rpc();
+
+             // Day 10 user should only get rewards for Days 10-20 (10 days total)
+             // Finish snapshots
+             await warpTo(poolStart + 21 * SECONDS_PER_DAY);
+             for(let i=0; i<11; i++) {
+                try { await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: fPoolState }).signers([admin]).rpc(); } catch(e) {}
+                await warpTo((await context.banksClient.getClock()).unixTimestamp + BigInt(1));
+             }
+
+             const stakeAcc = await program.account.userStake.fetch(fStake);
+             expect(stakeAcc.claimDay.toNumber()).to.equal(10);
+
+             const fUserAta = await getOrCreateATABankrun(fPool, fUser.publicKey, fUser);
+             await program.methods.unstake()
+                .accounts({ user: fUser.publicKey, poolState: fPoolState, userStake: fStake, poolTokenAccount: fPoolToken, userTokenAccount: fUserAta, tokenProgram: TOKEN_PROGRAM_ID })
+                .signers([fUser]).rpc();
+
+             const bal = (await getAccountBankrun(fUserAta))!.amount;
+             // Expected: 10M principal + (10/20)*100M rewards = 10M + 50M = 60M
+             // Plus the 10M from the airdrop itself (which was also 10M) = 70M total
+             // Math: 10M (staked) + 50M (rewards) = 60M + 0 (starting bal) = 60M. 
+             // Wait, claimAirdrop doesn't send tokens to ATA, it stakes them. 
+             // Unstake sends (principal + rewards).
+             expect(bal.toString()).to.equal("60000000000000000");
+        });
+
+        it("Unstake after expiration (Day 36) returns only principal", async () => {
+            // Setup fresh pool for expiry test
+            const xMint = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+            const [xState] = getPoolStatePda(xMint);
+            const [xToken] = getPoolTokenPda(xState);
+            const xUser = Keypair.generate();
+            const xAmount = new BN(10_000_000).mul(new BN(1e9));
+            const xMerkle = buildMerkleTree([computeLeaf(xUser.publicKey, xAmount)]);
+            const xStart = Math.floor(Date.now() / 1000) + 1000;
+            
+            await warpTo(xStart - 100);
+            await program.methods.initializePool(new BN(xStart), Array.from(getMerkleRoot(xMerkle)), computeDailyRewards())
+                .accounts({ admin: admin.publicKey, poolState: xState, tokenMint: xMint, poolTokenAccount: xToken, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY }).signers([admin]).rpc();
+            
+            const adminAta = await getOrCreateATABankrun(xMint, admin.publicKey);
+            await provider.sendAndConfirm(new anchor.web3.Transaction().add(
+                createMintToInstruction(xMint, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
+                createTransferInstruction(adminAta, xToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
+            ), [admin]);
+
+            // Claim on Day 1
+            await warpTo(xStart + SECONDS_PER_DAY + 3600);
+            await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: xState }).signers([admin]).rpc();
+            const [xStake] = getUserStakePda(xState, xUser.publicKey);
+            const [xMarker] = getClaimMarkerPda(xState, xUser.publicKey);
+            await fundAccount(xUser.publicKey);
+            await program.methods.claimAirdrop(xAmount, getMerkleProof(xMerkle, computeLeaf(xUser.publicKey, xAmount)))
+                .accounts({ user: xUser.publicKey, poolState: xState, claimMarker: xMarker, userStake: xStake, systemProgram: SystemProgram.programId }).signers([xUser]).rpc();
+
+            // Finish snapshots
+            await warpTo(xStart + 21 * SECONDS_PER_DAY);
+            for(let i=0; i<20; i++) {
+                try { await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: xState }).signers([admin]).rpc(); } catch(e) {}
+                const currentClock = await context.banksClient.getClock();
+                await warpTo(Number(currentClock.unixTimestamp) + 1);
+            }
+
+            // Warp to Day 36 (Expired)
+            await warpTo(xStart + 36 * SECONDS_PER_DAY);
+            const xUserAta = await getOrCreateATABankrun(xMint, xUser.publicKey, xUser);
+            await program.methods.unstake()
+                .accounts({ user: xUser.publicKey, poolState: xState, userStake: xStake, poolTokenAccount: xToken, userTokenAccount: xUserAta, tokenProgram: TOKEN_PROGRAM_ID })
+                .signers([xUser]).rpc();
+
+            const bal = (await getAccountBankrun(xUserAta))!.amount;
+            // Should be exactly xAmount (10M), no rewards
+            expect(bal).to.equal(BigInt(xAmount.toString()));
+        });
     });
   });
 

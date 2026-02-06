@@ -816,101 +816,106 @@
     },
     {
       "code": 6007,
+      "name": "InvalidDailyRewardsOrder",
+      "msg": "Daily rewards must be in ascending order"
+    },
+    {
+      "code": 6008,
       "name": "PoolPaused",
       "msg": "Pool is paused - operations temporarily disabled"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "PoolNotPaused",
       "msg": "Pool is not paused - cannot unpause"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "AlreadyPaused",
       "msg": "Pool is already paused"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "ProgramExpired",
       "msg": "Program has expired - claims are no longer accepted"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "NothingStaked",
       "msg": "Nothing staked - user has no active stake"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "InvalidStakeOwner",
       "msg": "User does not own this stake account"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "UnauthorizedAdmin",
       "msg": "Unauthorized - caller is not the pool admin"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "Unauthorized",
       "msg": "Unauthorized - generic access denied"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "InvalidMerkleProof",
       "msg": "Invalid merkle proof - verification failed"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "InvalidDay",
       "msg": "Invalid day - must be between 1 and 20"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "SnapshotTooEarly",
       "msg": "Snapshot too early - day has not yet elapsed"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "SnapshotRequiredFirst",
       "msg": "Previous day's snapshot must be taken before claims/unstakes"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "SnapshotAlreadyExists",
       "msg": "Snapshot already exists for this day - cannot overwrite"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "SnapshotsNotCompleted",
       "msg": "Snapshots not completed - must take all 20 snapshots"
     },
     {
-      "code": 6021,
+      "code": 6022,
       "name": "InvalidPoolTokenAccount",
       "msg": "Invalid pool token account - does not match pool state"
     },
     {
-      "code": 6022,
+      "code": 6023,
       "name": "InvalidUserTokenMint",
       "msg": "Invalid user token account - mint does not match pool"
     },
     {
-      "code": 6023,
+      "code": 6024,
       "name": "InvalidAdminTokenMint",
       "msg": "Invalid admin token account - mint does not match pool"
     },
     {
-      "code": 6024,
+      "code": 6025,
       "name": "ExitWindowNotFinished",
       "msg": "Exit window not finished - must wait until day 35"
     },
     {
-      "code": 6025,
+      "code": 6026,
       "name": "NothingToRecover",
       "msg": "No tokens to recover - pool balance equals staked amount"
     },
     {
-      "code": 6026,
+      "code": 6027,
       "name": "PoolNotStartedYet",
       "msg": "Pool not started yet - must wait until start time"
     }
