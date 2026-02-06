@@ -82,8 +82,11 @@ function parsePoolState(data: Buffer): PoolData {
   const paused = data.readUInt8(offset);
   offset += 1;
 
-  // _padding
-  offset += 3;
+  const activeStakers = data.readUInt32LE(offset);
+  offset += 4;
+
+  const totalUnstaked = data.readUInt32LE(offset);
+  offset += 4;
 
   // daily_rewards (32 * u64)
   const dailyRewards: bigint[] = [];
@@ -216,7 +219,7 @@ async function main() {
   const currentDay =
     pool.startTime > now
       ? 0
-      : Math.floor(elapsedSeconds / SECONDS_PER_DAY) + 1;
+      : Math.floor(elapsedSeconds / SECONDS_PER_DAY);
 
   // Fetch user stake
   const userStakeAccount = await connection.getAccountInfo(userStakePda);
@@ -236,11 +239,24 @@ async function main() {
     pool.dailySnapshots
   );
 
+  // Fetch user SPL token balance
+  let walletBalance = 0n;
+  try {
+    const userAta = await connection.getTokenAccountsByOwner(userPubkey, { mint: tokenMint });
+    if (userAta.value.length > 0) {
+      const balance = await connection.getTokenAccountBalance(userAta.value[0].pubkey);
+      walletBalance = BigInt(balance.value.amount);
+    }
+  } catch (e) {
+    // ignore error if no ATA
+  }
+
   // Output
   console.log();
   console.log("=== Reward Calculator ===");
   console.log(`Address:        ${userPubkey.toBase58()}`);
-  console.log(`Staked Amount:  ${formatTokens(userStake.stakedAmount)} tokens`);
+  console.log(`Wallet Balance: ${formatTokens(walletBalance)} tokens (Unstaked)`);
+  console.log(`Staked Amount:  ${formatTokens(userStake.stakedAmount)} tokens (Staked)`);
   console.log(`Claim Day:      ${userStake.claimDay}`);
   console.log(`Current Day:    ${currentDay}`);
   console.log(`Snapshots:      ${pool.snapshotCount}`);

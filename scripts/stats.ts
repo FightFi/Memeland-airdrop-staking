@@ -70,6 +70,8 @@ interface PoolData {
   snapshotCount: number;
   terminated: number;
   paused: number;
+  activeStakers: number;
+  totalUnstaked: number;
   dailyRewards: bigint[];
   dailySnapshots: bigint[];
 }
@@ -113,8 +115,11 @@ function parsePoolState(data: Buffer): PoolData {
   const paused = data.readUInt8(offset);
   offset += 1;
 
-  // _padding
-  offset += 3;
+  const activeStakers = data.readUInt32LE(offset);
+  offset += 4;
+
+  const totalUnstaked = data.readUInt32LE(offset);
+  offset += 4;
 
   // daily_rewards (32 * u64)
   const dailyRewards: bigint[] = [];
@@ -140,6 +145,8 @@ function parsePoolState(data: Buffer): PoolData {
     snapshotCount,
     terminated,
     paused,
+    activeStakers,
+    totalUnstaked,
     dailyRewards,
     dailySnapshots,
   };
@@ -230,7 +237,7 @@ async function main() {
 
   // Calculate time-based metrics
   const elapsedSeconds = Math.max(0, now - pool.startTime);
-  const currentDay = pool.startTime > now ? 0 : Math.floor(elapsedSeconds / SECONDS_PER_DAY) + 1;
+  const currentDay = pool.startTime > now ? 0 : Math.floor(elapsedSeconds / SECONDS_PER_DAY);
   const daysRemaining = Math.max(0, TOTAL_DAYS - currentDay + 1);
   const exitWindowDay = TOTAL_DAYS + EXIT_WINDOW_DAYS;
   const isInExitWindow = currentDay > TOTAL_DAYS && currentDay <= exitWindowDay;
@@ -496,11 +503,11 @@ async function main() {
 
   // Staking
   log("\n┌─ STAKING ───────────────────────────────────────────────────────┐");
-  log(`│  Active Stakers:   ${activeStakers.toLocaleString()}`);
-  log(`│  Unstaked:         ~${estimatedUnstaked.toLocaleString()} (estimated)`);
+  log(`│  Active Stakers:   ${pool.activeStakers.toLocaleString()} (on-chain)`);
+  log(`│  Unstaked:         ${pool.totalUnstaked.toLocaleString()} (on-chain)`);
   log(`│  Total Staked:     ${formatTokens(pool.totalStaked)} tokens`);
-  if (activeStakers > 0) {
-    log(`│  Average Stake:    ${formatTokens(pool.totalStaked / BigInt(activeStakers))} tokens`);
+  if (pool.activeStakers > 0) {
+    log(`│  Average Stake:    ${formatTokens(pool.totalStaked / BigInt(pool.activeStakers))} tokens`);
     log(`│  Largest Stake:    ${formatTokens(largestStake)} tokens`);
     log(`│  Smallest Stake:   ${formatTokens(smallestStake)} tokens`);
   }
@@ -517,23 +524,26 @@ async function main() {
     log("└─────────────────────────────────────────────────────────────────┘");
   }
 
-  // Snapshots
+  // Snapshots — snapshot for day N is taken on day N+1, so required = currentDay (not currentDay+1)
+  const snapshotsRequired = Math.min(currentDay, TOTAL_DAYS);
   log("\n┌─ SNAPSHOTS ─────────────────────────────────────────────────────┐");
-  log(`│  Taken:     ${pool.snapshotCount} / ${Math.min(currentDay, TOTAL_DAYS)}`);
-  const missingSnapshots = Math.max(0, Math.min(currentDay, TOTAL_DAYS) - pool.snapshotCount);
+  log(`│  Taken:     ${pool.snapshotCount} / ${snapshotsRequired}`);
+  const missingSnapshots = Math.max(0, snapshotsRequired - pool.snapshotCount);
   if (missingSnapshots > 0) {
-    log(`│  ⚠️  Missing: ${missingSnapshots} snapshot(s) - run 'yarn snapshot:devnet --backfill'`);
+    log(`│  ⚠️  Missing: ${missingSnapshots} snapshot(s) - run 'yarn snapshot:devnet'`);
   } else {
     log(`│  ✅ All snapshots up to date`);
   }
 
   // Show recent snapshots
-  log("│");
-  log("│  Recent Snapshots:");
-  const startIdx = Math.max(0, pool.snapshotCount - 5);
-  for (let i = startIdx; i < Math.min(pool.snapshotCount, TOTAL_DAYS); i++) {
-    const snap = pool.dailySnapshots[i];
-    log(`│    Day ${(i + 1).toString().padStart(2)}: ${formatTokens(snap).padStart(20)} tokens staked`);
+  if (pool.snapshotCount > 0) {
+    log("│");
+    log("│  Recent Snapshots:");
+    const startIdx = Math.max(0, pool.snapshotCount - 5);
+    for (let i = startIdx; i < Math.min(pool.snapshotCount, TOTAL_DAYS); i++) {
+      const snap = pool.dailySnapshots[i];
+      log(`│    Day ${i.toString().padStart(2)}: ${formatTokens(snap).padStart(20)} tokens staked`);
+    }
   }
   log("└─────────────────────────────────────────────────────────────────┘");
 

@@ -146,7 +146,7 @@ async function main() {
   // Start time
   const startTime = startTimeOverride
     ? parseInt(startTimeOverride)
-    : Math.floor(Date.now() / 1000);
+    : Math.floor(Date.now() / 1000) + 300; // default: 5 minutes from now
   const startDate = new Date(startTime * 1000);
   console.log(`\nStart time: ${startTime} (${startDate.toUTCString()})`);
 

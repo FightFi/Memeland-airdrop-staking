@@ -1,5 +1,5 @@
 {
-  "address": "4y6rh1SKMAGvunes2gHCeJkEkmPVDLhWYxNg8Zpd7RqH",
+  "address": "4uxX6uS3V9pyP3ei8NWZzz6RsqSddEhwosSqLD3ZbsVs",
   "metadata": {
     "name": "memeland_airdrop",
     "version": "0.1.0",
@@ -1056,6 +1056,14 @@
           {
             "name": "paused",
             "type": "u8"
+          },
+          {
+            "name": "active_stakers",
+            "type": "u32"
+          },
+          {
+            "name": "total_unstaked",
+            "type": "u32"
           },
           {
             "name": "daily_rewards",

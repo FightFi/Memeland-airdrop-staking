@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak;
 use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("4y6rh1SKMAGvunes2gHCeJkEkmPVDLhWYxNg8Zpd7RqH");
+declare_id!("4uxX6uS3V9pyP3ei8NWZzz6RsqSddEhwosSqLD3ZbsVs");
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -141,6 +141,7 @@ pub mod memeland_airdrop {
 
         pool.total_staked = pool.total_staked.checked_add(amount).unwrap();
         pool.total_airdrop_claimed = pool.total_airdrop_claimed.checked_add(amount).unwrap();
+        pool.active_stakers = pool.active_stakers.checked_add(1).unwrap();
 
         require!(
             pool.total_airdrop_claimed <= AIRDROP_POOL,
@@ -168,7 +169,7 @@ pub mod memeland_airdrop {
     pub fn snapshot(ctx: Context<Snapshot>) -> Result<()> {
         let pool = &mut ctx.accounts.pool_state;
         let clock = Clock::get()?;
-
+    
         require!(pool.paused == 0, ErrorCode::PoolPaused);
         require!(pool.terminated == 0, ErrorCode::PoolTerminated);
 
@@ -207,6 +208,20 @@ pub mod memeland_airdrop {
         } else {
             msg!("No snapshots needed for today.");
         }
+
+        // log each daily snapshot
+        for d in 0..(current_day as usize) {
+            msg!("Daily snapshot {}: total_staked = {}", d, pool.daily_snapshots[d]);
+        }
+        msg!("Start time: {}", pool.start_time);
+        msg!("Current time: {}", clock.unix_timestamp);
+        msg!("Current day: {}", get_current_day(pool.start_time, clock.unix_timestamp));
+        msg!("Total staked: {}", pool.total_staked);
+        msg!("Total airdrop claimed: {}", pool.total_airdrop_claimed);
+        msg!("Snapshot count: {}", pool.snapshot_count);
+        msg!("Daily snapshots: {:?}", pool.daily_snapshots);
+        msg!("Active stakers: {}", pool.active_stakers);
+        msg!("Total unstaked: {}", pool.total_unstaked);
         Ok(())
     }
 
@@ -270,6 +285,8 @@ pub mod memeland_airdrop {
 
         // Update pool state (UserStake account is closed by Anchor's close constraint)
         pool.total_staked = pool.total_staked.checked_sub(user_stake.staked_amount).unwrap();
+        pool.active_stakers = pool.active_stakers.checked_sub(1).unwrap();
+        pool.total_unstaked = pool.total_unstaked.checked_add(1).unwrap();
 
         emit!(Unstaked {
             user: user_stake.owner,
@@ -811,6 +828,8 @@ pub struct PoolState {
     pub bump: u8,                         // 1
     pub pool_token_bump: u8,              // 1
     pub paused: u8,                       // 1  (0 = active, 1 = paused)
+    pub active_stakers: u32,              // 4
+    pub total_unstaked: u32,              // 4
     pub daily_rewards: [u64; 32],         // 256 (only 0..20 used)
     pub daily_snapshots: [u64; 32],       // 256 (only 0..20 used)
 }
