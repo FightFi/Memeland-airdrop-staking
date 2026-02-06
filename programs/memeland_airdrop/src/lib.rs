@@ -573,6 +573,12 @@ pub struct InitializePool<'info> {
     pub admin: Signer<'info>,
 
     #[account(
+        constraint = upgrade_authority.key()
+            == ctx.program_upgrade_authority().unwrap()
+    )]
+    pub upgrade_authority: Signer<'info>,
+
+    #[account(
         init,
         payer = admin,
         space = 8 + POOL_STATE_SIZE,
