@@ -10,6 +10,8 @@ A Solana smart contract that distributes 150,000,000 $FIGHT tokens through a com
 | Staking rewards | 100,000,000 | 2/3 |
 | **Total** | **150,000,000** | |
 
+Token decimals: **9** (amounts are stored as raw units × 10⁹)
+
 ## How It Works
 
 ### Airdrop & Auto-Staking
@@ -25,8 +27,8 @@ The allowlist is a CSV file mapping wallets to their airdrop amounts:
 
 ```csv
 wallet,amount
-7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV,1000000.000000
-BLDpSMCi4FUYcY3sMfZRjcMTSqRTkGFB5gVH8GhnBi3P,2500000.000000
+7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV,1000000.000000000
+BLDpSMCi4FUYcY3sMfZRjcMTSqRTkGFB5gVH8GhnBi3P,2500000.000000000
 ```
 
 A build script computes the merkle tree and outputs a JSON file with the root and per-user proofs:
@@ -35,113 +37,173 @@ A build script computes the merkle tree and outputs a JSON file with the root an
 yarn build-merkle data/allowlist.csv
 ```
 
-This produces a JSON file containing:
-- `merkleRoot` — pass to `initialize_pool` at launch
-- `claims[wallet].proof` — each user submits this when calling `claim_airdrop`
-
-The contract verifies on-chain that `keccak256(wallet + amount)` hashes up to the stored root via the proof. Users cannot claim amounts they weren't assigned, and they cannot claim without a valid proof.
+Output JSON contains:
+- `merkleRoot` — pass to `initialize_pool`
+- `claims[wallet].proof` — user submits with `claim_airdrop`
+- `claims[wallet].amountRaw` — raw token amount (9 decimals)
 
 ### Exponential Emission Curve
-Daily staking rewards follow an exponential curve over 20 days:
+
+Daily staking rewards follow an exponential curve (K ≈ 0.05):
 
 ```
-R(d) = R₁ × e^(k × (d - 1))    where k ≈ 0.05
+R(d) = R₁ × e^(k × (d - 1))
 ```
 
-- Day 1: ~3.5M tokens
-- Day 20: ~9.1M tokens (~2.6x day 1)
-- Last 5 days emit ~35%+ of total staking rewards
-- Rewards are pre-computed on-chain during pool initialization
+| Day | Reward (approx) |
+|-----|-----------------|
+| 1   | ~2.98M tokens |
+| 10  | ~4.68M tokens |
+| 20  | ~7.72M tokens |
+
+- Last 5 days emit ~35% of total staking rewards
+- Rewards are computed off-chain and validated on-chain (must sum to exactly 100M)
 
 ### Daily Snapshots
-- An admin calls `snapshot()` once per day between **12:00–12:05 AM UTC**
-- Each snapshot records the current `total_staked` for that day
-- This determines how the day's reward pool is split among stakers
-- Up to 20 snapshots (one per day of the program)
+
+**Design:** Admin can take snapshots **anytime** during the day (no fixed time window).
+
+- Admin calls `snapshot()` once per day to record `total_staked`
+- Claims and unstakes are **blocked** on day N (N ≥ 2) until snapshot for day N-1 exists
+- Days 0-1: Free operations (no previous snapshot required)
+- If admin misses a snapshot, `backfill_snapshot(day)` can be used to catch up
+
+| Day | Required Snapshots |
+|-----|-------------------|
+| 0-1 | None |
+| 2   | Snapshot 1 |
+| 3   | Snapshots 1-2 |
+| N   | Snapshots 1 to N-1 |
 
 ### Reward Accumulation & Pro-Rata Distribution
-- Rewards are **not distributed daily** — they accumulate
-- For each day, a user's share is: `(user_staked / daily_snapshot_total) × daily_reward`
-- On unstake, all accumulated rewards across all completed days are paid out at once
-- `calculate_rewards(day)` lets users preview their reward for any given day
-- For future days (not yet snapshotted), the last known snapshot total is used
+
+- Rewards accumulate and are paid out on unstake
+- For each day: `user_reward = (user_staked / daily_snapshot_total) × daily_reward`
+- `calculate_rewards(day)` lets users preview rewards for any day
+- For future days, the last snapshot value is used for estimates
 
 ### One-Way Unstake
-- Calling `unstake` is **permanent** — there is no re-entry
-- On unstake, users receive their original staked tokens plus all accumulated rewards
-- Unstaked users cannot re-claim or re-stake
-- Unstaking is blocked during the snapshot window (12:00–12:05 AM UTC)
 
-### Terminate Pool
-- Admin can call `terminate_pool` to permanently stop the program
-- Blocked claims: no new airdrops can be claimed after termination
-- Existing stakers can still unstake and receive their principal + accrued rewards
-- Remaining pool tokens are transferred to the admin
+- `unstake` is **permanent** — no re-entry
+- Returns principal + all accumulated rewards
+- `UserStake` account is closed (rent returned to user)
+- `ClaimMarker` persists (prevents re-claiming)
+
+### Pool Lifecycle
+
+```
+Day 0-20: Active staking period
+  └── Users claim and stake
+  └── Admin takes daily snapshots
+  └── Users can unstake anytime (after required snapshots)
+  └── Admin can pause/unpause for emergencies
+
+Day 20-35: Exit window (15 days grace period)
+  └── No new claims
+  └── Users can still unstake with rewards
+
+After Day 35:
+  └── Admin can recover unclaimed rewards (user principal protected)
+  └── Admin can close pool when all users have unstaked
+```
+
+### Emergency Pause
+
+Admin can pause the pool at any time to block:
+- `claim_airdrop` - new claims blocked
+- `snapshot` - snapshots blocked
+- `backfill_snapshot` - backfills blocked
+
+**Users can ALWAYS unstake** even when paused - this protects user funds.
 
 ## Architecture
 
 ### Accounts
 
-**PoolState** (zero-copy, PDA seeded by `["pool_state", mint]`)
-- Stores admin, mint, token account references, merkle root
-- Pre-computed `daily_rewards[32]` array (indices 0–19 used)
-- `daily_snapshots[32]` array recording total_staked per day
+**PoolState** (zero-copy, PDA: `["pool_state", mint]`)
+- Admin, mint, token account references, merkle root
+- `daily_rewards[32]` — pre-computed reward curve (indices 0-19 used)
+- `daily_snapshots[32]` — recorded total_staked per day
+- `snapshot_count` — highest day snapshotted
 
-**UserStake** (PDA seeded by `["user_stake", pool_state, user]`)
-- Tracks staked amount, claim day (day user joined)
-- Flags: `has_claimed_airdrop`, `has_unstaked`
+**ClaimMarker** (PDA: `["claimed", pool_state, user]`)
+- Permanent marker preventing re-claims (~0.001 SOL rent)
+- Created on claim, never closed
 
-**Pool Token Account** (PDA seeded by `["pool_token", pool_state]`)
-- PDA-authority token account holding all pool tokens (150M)
+**UserStake** (PDA: `["user_stake", pool_state, user]`)
+- `staked_amount`, `claim_day`, `owner`
+- Created on claim, **closed on unstake** (rent returned)
+
+**Pool Token Account** (PDA: `["pool_token", pool_state]`)
+- Self-authority token account holding all pool tokens
 
 ### Instructions
 
-| Instruction | Signer(s) | Description |
-|-------------|-----------|-------------|
-| `initialize_pool(start_time, merkle_root)` | admin | Creates pool, stores merkle root, pre-computes exponential curve |
-| `claim_airdrop(amount, proof)` | user | Verifies merkle proof, claims airdrop, auto-stakes tokens |
-| `snapshot()` | admin | Records daily total_staked (12:00–12:05 AM UTC only) |
-| `unstake()` | user | Permanent exit: returns stake + all accumulated rewards |
-| `terminate_pool()` | admin | Stops claims, transfers remaining tokens to admin |
-| `calculate_rewards(day)` | none | View function: logs user's reward for a specific day |
+| Instruction | Signer | Description |
+|-------------|--------|-------------|
+| `initialize_pool(start_time, merkle_root, daily_rewards)` | admin | Creates pool, validates rewards sum |
+| `claim_airdrop(amount, proof)` | user | Verifies proof, creates ClaimMarker + UserStake |
+| `snapshot()` | admin | Records daily total_staked |
+| `backfill_snapshot(day)` | admin | Backfill missed snapshot |
+| `unstake()` | user | Exit: returns stake + rewards, closes UserStake |
+| `pause_pool()` | admin | Emergency pause - blocks claims/snapshots |
+| `unpause_pool()` | admin | Resume normal operations |
+| `terminate_pool()` | admin | Stops claims, drains excess tokens |
+| `recover_expired_tokens()` | admin | After day 35, recover unclaimed rewards |
+| `close_pool()` | admin | Close pool when empty |
+| `calculate_rewards(day)` | none | View: logs user's reward for a day |
+
+### Events
+
+```rust
+PoolInitialized { admin, token_mint, start_time }
+AirdropClaimed { user, amount, claim_day }
+SnapshotTaken { day, total_staked }
+Unstaked { user, principal, rewards }
+PoolPausedEvent { admin }
+PoolUnpausedEvent { admin }
+PoolTerminated { drained_amount }
+TokensRecovered { amount }
+PoolClosed { lamports_returned }
+```
 
 ## Project Structure
 
 ```
 memeland-airdrop/
 ├── programs/memeland_airdrop/src/lib.rs   # Smart contract
-├── target/idl/memeland_airdrop.json       # IDL (manually maintained)
-├── tests/memeland_airdrop.ts              # Test suite (22 tests)
+├── target/idl/memeland_airdrop.json       # IDL
+├── tests/memeland_airdrop.ts              # Test suite (64 tests)
 ├── scripts/
-│   ├── build-merkle-tree.ts               # CSV → merkle root + proofs JSON
-│   ├── initialize-pool.ts                 # Initialize pool + fund 150M tokens
+│   ├── build-merkle-tree.ts               # CSV → merkle JSON
+│   ├── initialize-pool.ts                 # Initialize + fund pool
 │   ├── snapshot.ts                        # Daily snapshot caller
-│   └── generate-keypairs.ts               # Keypair generator for devnet
+│   ├── utils/rewards.ts                   # Shared reward computation
+│   └── generate-keypairs.ts               # Keypair generator
 ├── data/
-│   ├── allowlist-example.csv              # Example allowlist (8 wallets)
-│   └── allowlist-example-merkle.json      # Generated merkle output
+│   └── allowlist-example.csv              # Example allowlist
 ├── .env.local                             # Local validator config
 ├── .env.testnet                           # Devnet config
 ├── .env.prod                              # Mainnet config
-└── Anchor.toml                            # Anchor configuration
+└── Anchor.toml
 ```
 
 ## Scripts
 
 | Command | Description |
 |---------|-------------|
-| `yarn build-merkle <csv>` | Build merkle tree from allowlist CSV |
-| `yarn generate-keypairs` | Generate admin + token-mint keypairs for devnet |
-| `yarn init-pool:devnet` | Initialize pool + fund 150M on devnet |
-| `yarn init-pool:prod` | Initialize pool + fund 150M on mainnet |
-| `yarn snapshot:devnet` | Take daily snapshot on devnet |
-| `yarn snapshot:prod` | Take daily snapshot on mainnet |
-| `anchor test --skip-build` | Run test suite (22 tests) |
-| `anchor build --no-idl` | Build the program |
+| `yarn build-merkle <csv>` | Build merkle tree from allowlist |
+| `yarn generate-keypairs` | Generate admin + mint keypairs |
+| `yarn init-pool:devnet` | Initialize pool on devnet |
+| `yarn init-pool:prod` | Initialize pool on mainnet |
+| `yarn snapshot:devnet` | Take today's snapshot on devnet (idempotent) |
+| `yarn snapshot:prod` | Take today's snapshot on mainnet (idempotent) |
+| `yarn snapshot:devnet:backfill` | Backfill all missing snapshots (devnet) |
+| `yarn snapshot:prod:backfill` | Backfill all missing snapshots (mainnet) |
+| `anchor test` | Run test suite (64 tests) |
+| `anchor build` | Build the program |
 
 ## Environment Variables
-
-All `.env` files support these variables:
 
 | Variable | Description |
 |----------|-------------|
@@ -150,183 +212,204 @@ All `.env` files support these variables:
 | `PROGRAM_ID` | Deployed program address |
 | `TOKEN_MINT` | $FIGHT token mint address |
 | `MERKLE_JSON` | Path to merkle tree JSON |
-| `START_TIME` | (optional) Unix timestamp for pool start, defaults to now |
-
-The mainnet $FIGHT token mint is `8f62NyJGo7He5uWeveTA2JJQf4xzf8aqxkmzxRQ3mxfU`.
+| `START_TIME` | (optional) Unix timestamp for pool start |
 
 ## Prerequisites
 
-- Rust (1.84+ for SBF target)
-- [Solana CLI](https://docs.solanalabs.com/cli/install) (v2+)
-- [Anchor CLI](https://www.anchor-lang.com/docs/installation) (0.30.1)
-- Node.js 18+ and Yarn
+- Rust 1.84+
+- [Solana CLI](https://docs.solanalabs.com/cli/install) v2+
+- [Anchor CLI](https://www.anchor-lang.com/docs/installation) 0.31.0
+- Node.js 20+ and Yarn
 
-## Build
-
-```bash
-anchor build --no-idl
-```
-
-> The `--no-idl` flag is required because IDL auto-generation has a compatibility issue with the current proc-macro2 version. The IDL at `target/idl/memeland_airdrop.json` is maintained manually.
-
-## Build Merkle Tree
-
-1. Create your allowlist CSV (see `data/allowlist-example.csv` for format):
-
-```csv
-wallet,amount
-7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV,1000000.000000
-```
-
-2. Generate the merkle tree:
+## Build & Test
 
 ```bash
-yarn build-merkle data/allowlist.csv                    # outputs data/allowlist-merkle.json
-yarn build-merkle data/allowlist.csv data/output.json   # custom output path
+# Build
+anchor build
+
+# Test (64 tests)
+anchor test
 ```
 
-3. The output JSON contains:
-   - `merkleRoot` — array of 32 bytes, pass to `initialize_pool`
-   - `claims[wallet].proof` — array of 32-byte arrays, user submits with `claim_airdrop`
-   - `claims[wallet].amountRaw` — raw token amount in lamports
-
-The script validates wallet addresses, rejects duplicates, and converts human-readable amounts (6 decimals) to raw lamports.
-
-## Test
-
-Run the full test suite against a local validator:
-
-```bash
-anchor test --skip-build
-```
-
-This starts a local Solana validator, deploys the program, and runs all 22 tests covering:
-- Pool initialization and exponential curve verification
-- Pool funding (150M tokens)
-- Airdrop claiming (auto-stake, double-claim prevention, merkle proof verification)
-- Daily snapshots (admin-only, time-window enforcement)
-- Unstaking (permanent exit, principal + accumulated rewards)
-- Exponential curve validation (day 20 > day 1, last-5-day concentration, monotonicity)
-- Terminate pool (admin terminate, double-terminate rejection, claims blocked)
-- Multi-user pro-rata rewards (3:1 stake ratio → 3:1 reward ratio)
-- calculate_rewards view function (valid day, invalid day rejection)
-
-To rebuild and test:
-
-```bash
-anchor build --no-idl && anchor test --skip-build
-```
-
-## Deploy & Initialize
+## Deploy
 
 ### Devnet
 
-1. Generate keypairs:
-
 ```bash
+# 1. Generate keypairs
 yarn generate-keypairs
-```
 
-2. Fund the admin wallet via faucet:
-
-```bash
+# 2. Fund admin wallet
 solana airdrop 2 <ADMIN_PUBKEY> --url devnet
-```
 
-3. Create a devnet $FIGHT token, mint 150M to the admin wallet, and set `TOKEN_MINT` in `.env.testnet`.
-
-4. Build your allowlist and generate the merkle tree:
-
-```bash
+# 3. Build merkle tree
 yarn build-merkle data/allowlist.csv
-```
 
-5. Deploy the program:
+# 4. Deploy
+anchor deploy --provider.cluster devnet
 
-```bash
-anchor deploy --provider.cluster devnet --provider.wallet ./keypairs/admin.json
-```
-
-6. Initialize pool and fund with 150M tokens:
-
-```bash
+# 5. Initialize and fund
 yarn init-pool:devnet
 ```
 
-This single command reads the merkle root from the JSON, calls `initialize_pool`, and transfers 150M tokens from the admin's ATA to the pool.
-
 ### Mainnet
 
-1. Set `ANCHOR_WALLET` in `.env.prod` to your admin keypair path
-2. Ensure the admin wallet has enough SOL for rent + tx fees
-3. Ensure the admin wallet holds 150M $FIGHT tokens
-4. Build the merkle tree from your production allowlist
-5. Deploy:
-
 ```bash
-anchor deploy --provider.cluster mainnet --provider.wallet /path/to/admin.json
-```
+# 1. Configure .env.prod with admin wallet, token mint, merkle JSON
+# 2. Ensure admin has SOL + 150M $FIGHT tokens
 
-6. Initialize and fund:
+# 3. Deploy
+anchor deploy --provider.cluster mainnet
 
-```bash
+# 4. Initialize and fund
 yarn init-pool:prod
 ```
 
-> The `initialize_pool` instruction requires ~400k+ compute units due to on-chain exponential computation. The script automatically sets a 1M CU budget.
+## User Flow
 
-## Claiming (User Flow)
-
-1. User connects wallet to your frontend
-2. Frontend looks up the user's entry in the merkle JSON (`claims[wallet]`)
-3. Frontend calls `claim_airdrop(amountRaw, proof)` — only the user signs
-4. Contract verifies the proof against the on-chain merkle root
-5. Tokens are auto-staked and begin earning rewards immediately
-
-No backend, no admin signature, no centralized dependency after launch.
+1. User connects wallet to frontend
+2. Frontend looks up `claims[wallet]` in merkle JSON
+3. Frontend calls `claim_airdrop(amountRaw, proof)`
+4. Contract verifies proof, creates ClaimMarker + UserStake
+5. Tokens are auto-staked and earn rewards immediately
+6. User can unstake anytime to receive principal + accumulated rewards
 
 ## Admin Operations
 
 ### Daily Snapshot
 
-Call `snapshot()` once per day between 12:00–12:05 AM UTC:
+The snapshot script is smart and idempotent:
+- Detects the current program day
+- Checks if snapshot already exists for today
+- Only takes snapshot if missing
+- Handles pool paused/terminated states
 
 ```bash
+# Take today's snapshot (safe to run multiple times)
 yarn snapshot:prod
+
+# Backfill ALL missing snapshots (days 1 to current)
+yarn snapshot:prod:backfill
 ```
 
-This records the current total staked amount for reward calculations. Automate with cron:
+Automate with cron (script handles idempotency):
 
 ```bash
-# Run at midnight UTC every day
-0 0 * * * cd /path/to/memeland-airdrop && yarn snapshot:prod >> logs/snapshot.log 2>&1
+# Run daily at 6 AM UTC - safe to run even if already taken
+0 6 * * * cd /path/to/project && yarn snapshot:prod >> logs/snapshot.log 2>&1
+```
+
+Example output:
+```
+============================================================
+Memeland Airdrop - Snapshot Script
+============================================================
+Current UTC time: Tue, 04 Feb 2026 15:30:00 GMT
+Pool start time:  Mon, 03 Feb 2026 00:00:00 GMT
+Current day:      2 / 20
+Total staked:     1000000 tokens
+Snapshot count:   1
+Pool paused:      NO
+Pool terminated:  NO
+============================================================
+
+Missing snapshots for days: 2
+
+Will take snapshots for days: 2
+
+[Day 2] Calling snapshot()...
+[Day 2] Success! TX: 5abc...
+
+============================================================
+Completed: 1/1 snapshots taken.
+============================================================
+```
+
+### Emergency Pause/Unpause
+
+```typescript
+// Pause pool (blocks claims, snapshots)
+await program.methods
+  .pausePool()
+  .accounts({ admin: adminPubkey, poolState: poolStatePda })
+  .rpc();
+
+// Unpause pool (resume operations)
+await program.methods
+  .unpausePool()
+  .accounts({ admin: adminPubkey, poolState: poolStatePda })
+  .rpc();
 ```
 
 ### Termination
 
-Call `terminate_pool()` to permanently end the program. Existing stakers retain their principal and accrued rewards. Remaining tokens are returned to the admin.
+```bash
+# Terminate pool (blocks new claims, drains excess)
+# Users can still unstake
+```
+
+### Recovery (After Day 35)
+
+```bash
+# Recover unclaimed rewards (user principal protected)
+# Close pool when all users have unstaked
+```
 
 ## Program ID
 
 ```
-Abp5pKfeUysdsxZULSDSRxkG2v66gLPn6c1Yu1Zuk9jT
+4y6rh1SKMAGvunes2gHCeJkEkmPVDLhWYxNg8Zpd7RqH
 ```
 
 ## Error Codes
 
 | Code | Name | Description |
 |------|------|-------------|
-| 6000 | ProgramEnded | Current time is past the 20-day window |
-| 6001 | AlreadyClaimed | Wallet has already claimed the airdrop |
-| 6002 | PermanentlyExited | User has unstaked and cannot interact further |
-| 6003 | AirdropPoolExhausted | Airdrop pool (50M) has been fully claimed |
-| 6004 | NothingStaked | User has no staked balance to unstake |
-| 6005 | Unauthorized | Admin key mismatch or invalid signer |
-| 6006 | InvalidMerkleProof | Merkle proof does not verify against stored root |
-| 6007 | PoolTerminated | Pool has been terminated by admin |
-| 6008 | AlreadyTerminated | Pool is already terminated |
-| 6009 | AllSnapshotsTaken | All 20 daily snapshots have been recorded |
-| 6010 | SnapshotTooEarly | Day has not yet elapsed since last snapshot |
-| 6011 | OutsideSnapshotWindow | Not within 12:00–12:05 AM UTC window |
-| 6012 | UnstakeBlockedDuringSnapshot | Cannot unstake during snapshot window |
-| 6013 | InvalidDay | Day parameter is out of range (must be 0–19) |
+| 6000 | AirdropPoolExhausted | Airdrop pool (50M) fully claimed |
+| 6001 | NothingStaked | No staked balance to unstake |
+| 6002 | Unauthorized | Admin key mismatch |
+| 6003 | InvalidMerkleProof | Proof doesn't verify |
+| 6004 | PoolTerminated | Pool has been terminated |
+| 6005 | AlreadyTerminated | Pool already terminated |
+| 6006 | InvalidDay | Day out of range |
+| 6007 | SnapshotTooEarly | Day not yet elapsed |
+| 6008 | SnapshotRequiredFirst | Previous day's snapshot missing |
+| 6009 | InvalidDailyRewards | Rewards don't sum to STAKING_POOL |
+| 6010 | PoolNotTerminated | Must terminate before closing |
+| 6011 | PoolNotEmpty | Users must unstake before closing |
+| 6012 | ExitWindowNotFinished | Must wait until day 35 |
+| 6013 | NothingToRecover | No tokens to recover |
+| 6014 | SnapshotAlreadyExists | Snapshot already taken for this day |
+| 6015 | UnauthorizedAdmin | Signer is not the pool admin |
+| 6016 | InvalidStakeOwner | UserStake owner mismatch |
+| 6017 | InvalidPoolTokenAccount | Pool token account mismatch |
+| 6018 | PoolPaused | Pool is paused - operations disabled |
+| 6019 | PoolNotPaused | Pool is not paused |
+| 6020 | AlreadyPaused | Pool is already paused |
+
+## Constants
+
+```rust
+TOTAL_DAYS = 20              // Program duration
+SECONDS_PER_DAY = 86400      // 24 hours
+EXIT_WINDOW_DAYS = 15        // Grace period after day 20
+AIRDROP_POOL = 50M × 10⁹     // 50M tokens (9 decimals)
+STAKING_POOL = 100M × 10⁹    // 100M tokens (9 decimals)
+```
+
+## Security
+
+ Key points:
+
+- **Merkle claims**: Cryptographically verified, no admin signature needed
+- **ClaimMarker**: Permanent account prevents double-claims
+- **Snapshot protection**: Operations blocked until relevant snapshot taken
+- **Principal protection**: User funds protected in terminate and recovery
+- **PDA security**: All accounts derived from program ID with centralized seeds
+- **Overflow protection**: u128 intermediate math with checked operations
+- **Emergency pause**: Admin can pause pool; users can always unstake (funds protected)
+- **Specific error codes**: Constraint errors provide clear debugging information
+
+## License
+
+ISC

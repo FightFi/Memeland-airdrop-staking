@@ -19,7 +19,7 @@
  *
  * What this script does:
  *   1. Reads merkle root from the merkle JSON file
- *   2. Calls initialize_pool(start_time, merkle_root)
+ *   2. Calls initialize_pool(start_time, merkle_root, daily_rewards)
  *   3. Transfers 150M tokens from admin ATA to the pool token account
  */
 
@@ -29,9 +29,6 @@ import {
   Connection,
   Keypair,
   PublicKey,
-  ComputeBudgetProgram,
-  Transaction,
-  sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import {
   getOrCreateAssociatedTokenAccount,
@@ -39,7 +36,10 @@ import {
   getAccount,
 } from "@solana/spl-token";
 import * as anchor from "@coral-xyz/anchor";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { Program, AnchorProvider, BN, Idl } from "@coral-xyz/anchor";
+import { computeDailyRewards } from "./utils/rewards";
+import * as readline from "readline";
+
 
 // ── Config from env ─────────────────────────────────────────────────────────
 
@@ -52,7 +52,7 @@ function requireEnv(name: string): string {
   return val;
 }
 
-const TOTAL_SUPPLY = BigInt(150_000_000_000_000); // 150M with 6 decimals
+const TOTAL_SUPPLY = BigInt("150000000000000000"); // 150M with 9 decimals
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
@@ -99,13 +99,14 @@ async function main() {
 
   // Load IDL
   const idlPath = path.resolve(__dirname, "..", "target", "idl", "memeland_airdrop.json");
-  const idl = JSON.parse(fs.readFileSync(idlPath, "utf-8"));
+  const idl: Idl = JSON.parse(fs.readFileSync(idlPath, "utf-8"));
 
   // Create provider and program
   const wallet = new anchor.Wallet(admin);
   const provider = new AnchorProvider(connection, wallet, {
     commitment: "confirmed",
   });
+  console.log(`IDL Address: ${idl.address}`);
   const program = new Program(idl, provider);
 
   // Load merkle root
@@ -153,17 +154,38 @@ async function main() {
 
   console.log("\n--- Step 1: Initialize Pool ---");
 
+  const dailyRewards = computeDailyRewards();
+  console.log(`Daily rewards computed off-chain (${dailyRewards.length} days)`);
+
+  console.log("\nDaily Rewards Curve:"); 
+  
+  dailyRewards.forEach((r, i) => {
+    const tokenStr = Number(r).toLocaleString(undefined, { maximumFractionDigits: 2 });
+    console.log(`Day ${i + 1}: ${tokenStr} tokens`);
+  });
+  console.log("\n=== Step 1: Initialize Pool ===");
+  console.log("⚠️ Pool will be initialized with the following parameters:");
+  console.log(`- Program Id: ${programId.toBase58()}`);
+  console.log(`- Admin: ${admin.publicKey.toBase58()}`);
+  console.log(`- Token Mint: ${tokenMint.toBase58()}`);
+  console.log(`- Pool State PDA: ${poolState.toBase58()}`);
+  console.log(`- Pool Token Account PDA: ${poolTokenAccount.toBase58()}`);
+  console.log(`- Merkle Root: [${merkleRoot.slice(0, 4).join(", ")}...]`);
+  console.log(`- Start Time: ${startTime} (${new Date(startTime * 1000).toUTCString()})`);
+
+  const confirmed = await askConfirmation("Do you want to proceed with pool initialization?");
+  if (!confirmed) {
+    console.log("❌ Initialization aborted by user.");
+    process.exit(0);
+  }
   const tx = await program.methods
-    .initializePool(new BN(startTime), merkleRoot)
+    .initializePool(new BN(startTime), merkleRoot, dailyRewards)
     .accounts({
       admin: admin.publicKey,
       poolState,
       tokenMint,
       poolTokenAccount,
     })
-    .preInstructions([
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-    ])
     .rpc();
 
   console.log(`initialize_pool tx: ${tx}`);
@@ -189,11 +211,11 @@ async function main() {
   );
 
   const adminBalance = adminAta.amount;
-  console.log(`Admin token balance: ${Number(adminBalance) / 1e6} tokens`);
+  console.log(`Admin token balance: ${Number(adminBalance) / 1e9} tokens`);
 
   if (adminBalance < TOTAL_SUPPLY) {
     console.error(
-      `Insufficient token balance. Need ${Number(TOTAL_SUPPLY) / 1e6}, have ${Number(adminBalance) / 1e6}`
+      `Insufficient token balance. Need ${Number(TOTAL_SUPPLY) / 1e9}, have ${Number(adminBalance) / 1e9}`
     );
     process.exit(1);
   }
@@ -211,7 +233,7 @@ async function main() {
   // Verify pool balance
   const poolTokenInfo = await getAccount(connection, poolTokenAccount);
   console.log(
-    `Pool token balance: ${Number(poolTokenInfo.amount) / 1e6} tokens`
+    `Pool token balance: ${Number(poolTokenInfo.amount) / 1e9} tokens`
   );
 
   // ── Done ──────────────────────────────────────────────────────────────────
@@ -221,10 +243,26 @@ async function main() {
   console.log(`Pool Token Account: ${poolTokenAccount.toBase58()}`);
   console.log(`Token Mint:         ${tokenMint.toBase58()}`);
   console.log(`Start Time:         ${startDate.toUTCString()}`);
-  console.log(`Total Funded:       ${Number(TOTAL_SUPPLY) / 1e6} $FIGHT`);
+  console.log(`Total Funded:       ${Number(TOTAL_SUPPLY) / 1e9} $FIGHT`);
   console.log(`\nUsers can now claim airdrops using their merkle proofs.`);
   console.log(`Admin must call snapshot() daily at 12:00-12:05 AM UTC.`);
 }
+
+// --- Function to ask for confirmation ---
+async function askConfirmation(question: string): Promise<boolean> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    rl.question(question + " (y/n): ", (answer) => {
+      rl.close();
+      resolve(answer.toLowerCase() === "y");
+    });
+  });
+}
+
 
 main().catch((err) => {
   console.error("\nError:", err.message || err);
