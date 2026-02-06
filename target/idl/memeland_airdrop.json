@@ -8,43 +8,6 @@
   },
   "instructions": [
     {
-      "name": "backfill_snapshot",
-      "docs": [
-        "Admin-only backfill for missed snapshots.",
-        "Only for emergencies when regular snapshot() failed.",
-        "Cannot overwrite existing snapshots."
-      ],
-      "discriminator": [
-        154,
-        75,
-        153,
-        15,
-        64,
-        254,
-        54,
-        39
-      ],
-      "accounts": [
-        {
-          "name": "admin",
-          "docs": [
-            "Must be the pool admin to backfill snapshots"
-          ],
-          "signer": true
-        },
-        {
-          "name": "pool_state",
-          "writable": true
-        }
-      ],
-      "args": [
-        {
-          "name": "day",
-          "type": "u64"
-        }
-      ]
-    },
-    {
       "name": "calculate_rewards",
       "docs": [
         "View function: calculate potential rewards for a user on a given day.",
@@ -818,118 +781,138 @@
   "errors": [
     {
       "code": 6000,
+      "name": "StartTimeInPast",
+      "msg": "Start time is in the past - cannot initialize pool"
+    },
+    {
+      "code": 6001,
       "name": "AirdropPoolExhausted",
       "msg": "Airdrop pool exhausted - no more tokens available for claims"
     },
     {
-      "code": 6001,
+      "code": 6002,
       "name": "PoolTerminated",
       "msg": "Pool has been terminated - no new claims allowed"
     },
     {
-      "code": 6002,
+      "code": 6003,
       "name": "AlreadyTerminated",
       "msg": "Pool is already terminated - cannot terminate twice"
     },
     {
-      "code": 6003,
+      "code": 6004,
       "name": "PoolNotTerminated",
       "msg": "Pool must be terminated before closing"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "PoolNotEmpty",
       "msg": "Pool still has staked funds - all users must unstake first"
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "InvalidDailyRewards",
       "msg": "Daily rewards must sum to exactly STAKING_POOL (100M tokens)"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "PoolPaused",
       "msg": "Pool is paused - operations temporarily disabled"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "PoolNotPaused",
       "msg": "Pool is not paused - cannot unpause"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "AlreadyPaused",
       "msg": "Pool is already paused"
     },
     {
-      "code": 6009,
+      "code": 6010,
+      "name": "ProgramExpired",
+      "msg": "Program has expired - claims are no longer accepted"
+    },
+    {
+      "code": 6011,
       "name": "NothingStaked",
       "msg": "Nothing staked - user has no active stake"
     },
     {
-      "code": 6010,
+      "code": 6012,
       "name": "InvalidStakeOwner",
       "msg": "User does not own this stake account"
     },
     {
-      "code": 6011,
+      "code": 6013,
       "name": "UnauthorizedAdmin",
       "msg": "Unauthorized - caller is not the pool admin"
     },
     {
-      "code": 6012,
+      "code": 6014,
       "name": "Unauthorized",
       "msg": "Unauthorized - generic access denied"
     },
     {
-      "code": 6013,
+      "code": 6015,
       "name": "InvalidMerkleProof",
       "msg": "Invalid merkle proof - verification failed"
     },
     {
-      "code": 6014,
+      "code": 6016,
       "name": "InvalidDay",
       "msg": "Invalid day - must be between 1 and 20"
     },
     {
-      "code": 6015,
+      "code": 6017,
       "name": "SnapshotTooEarly",
       "msg": "Snapshot too early - day has not yet elapsed"
     },
     {
-      "code": 6016,
+      "code": 6018,
       "name": "SnapshotRequiredFirst",
       "msg": "Previous day's snapshot must be taken before claims/unstakes"
     },
     {
-      "code": 6017,
+      "code": 6019,
       "name": "SnapshotAlreadyExists",
       "msg": "Snapshot already exists for this day - cannot overwrite"
     },
     {
-      "code": 6018,
+      "code": 6020,
+      "name": "SnapshotsNotCompleted",
+      "msg": "Snapshots not completed - must take all 20 snapshots"
+    },
+    {
+      "code": 6021,
       "name": "InvalidPoolTokenAccount",
       "msg": "Invalid pool token account - does not match pool state"
     },
     {
-      "code": 6019,
+      "code": 6022,
       "name": "InvalidUserTokenMint",
       "msg": "Invalid user token account - mint does not match pool"
     },
     {
-      "code": 6020,
+      "code": 6023,
       "name": "InvalidAdminTokenMint",
       "msg": "Invalid admin token account - mint does not match pool"
     },
     {
-      "code": 6021,
+      "code": 6024,
       "name": "ExitWindowNotFinished",
       "msg": "Exit window not finished - must wait until day 35"
     },
     {
-      "code": 6022,
+      "code": 6025,
       "name": "NothingToRecover",
       "msg": "No tokens to recover - pool balance equals staked amount"
+    },
+    {
+      "code": 6026,
+      "name": "PoolNotStartedYet",
+      "msg": "Pool not started yet - must wait until start time"
     }
   ],
   "types": [
@@ -973,12 +956,7 @@
       "name": "PoolClosed",
       "type": {
         "kind": "struct",
-        "fields": [
-          {
-            "name": "lamports_returned",
-            "type": "u64"
-          }
-        ]
+        "fields": []
       }
     },
     {
@@ -1016,12 +994,8 @@
     {
       "name": "PoolState",
       "docs": [
-        "Pool state using zero_copy to avoid stack overflow."
+        "Pool state for the staking program."
       ],
-      "serialization": "bytemuckunsafe",
-      "repr": {
-        "kind": "c"
-      },
       "type": {
         "kind": "struct",
         "fields": [
@@ -1077,15 +1051,6 @@
           {
             "name": "paused",
             "type": "u8"
-          },
-          {
-            "name": "_padding",
-            "type": {
-              "array": [
-                "u8",
-                3
-              ]
-            }
           },
           {
             "name": "daily_rewards",

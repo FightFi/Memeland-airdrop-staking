@@ -16,6 +16,9 @@ pub const AIRDROP_POOL: u64 = 50_000_000_000_000_000;
 /// Staking rewards pool: 100_000_000 tokens × 10^9
 pub const STAKING_POOL: u64 = 100_000_000_000_000_000;
 
+/// TODO: Replace with actual admin pubkey before deployment
+pub const INIT_AUTHORITY: Pubkey = pubkey!("11111111111111111111111111111111");
+
 
 // ── Seeds ──────────────────────────────────────────────────────────────────────
 
@@ -47,7 +50,7 @@ pub mod memeland_airdrop {
             start_time > clock.unix_timestamp,
             ErrorCode::StartTimeInPast
         );
-        
+
         let pool = &mut ctx.accounts.pool_state;
         pool.admin = ctx.accounts.admin.key();
         pool.token_mint = ctx.accounts.token_mint.key();
@@ -236,7 +239,7 @@ pub mod memeland_airdrop {
                     pool.snapshot_count,
                     &pool.daily_rewards,
                     &pool.daily_snapshots,
-            );
+            )
         };
 
         let total_payout = user_stake
@@ -564,14 +567,11 @@ pub fn program_expired(start_time: i64, now: i64) -> bool {
 
 #[derive(Accounts)]
 pub struct InitializePool<'info> {
-    #[account(mut)]
-    pub admin: Signer<'info>,
-
     #[account(
-        constraint = upgrade_authority.key()
-            == ctx.program_upgrade_authority().unwrap()
+        mut,
+        constraint = admin.key() == INIT_AUTHORITY @ ErrorCode::Unauthorized,
     )]
-    pub upgrade_authority: Signer<'info>,
+    pub admin: Signer<'info>,
 
     #[account(
         init,
@@ -901,6 +901,8 @@ pub enum ErrorCode {
     PoolNotPaused,
     #[msg("Pool is already paused")]
     AlreadyPaused,
+    #[msg("Program has expired - claims are no longer accepted")]
+    ProgramExpired,
 
     // ── Stake Errors ───────────────────────────────────────────────────────────
     #[msg("Nothing staked - user has no active stake")]
