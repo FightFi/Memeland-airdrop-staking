@@ -103,7 +103,8 @@ pub mod memeland_airdrop {
             !program_expired(pool.start_time, clock.unix_timestamp),
             ErrorCode::ProgramExpired
         );
-
+       require!(clock.unix_timestamp > pool.start_time, ErrorCode::PoolNotStartedYet);
+       
         // Determine which day the user is claiming on
         let current_day = get_current_day(pool.start_time, clock.unix_timestamp);
 
@@ -962,4 +963,6 @@ pub enum ErrorCode {
     ExitWindowNotFinished,
     #[msg("No tokens to recover - pool balance equals staked amount")]
     NothingToRecover,
+    #[msg("Pool not started yet - must wait until start time")]
+    PoolNotStartedYet,
 }
