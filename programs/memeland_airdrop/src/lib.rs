@@ -16,9 +16,6 @@ pub const AIRDROP_POOL: u64 = 50_000_000_000_000_000;
 /// Staking rewards pool: 100_000_000 tokens × 10^9
 pub const STAKING_POOL: u64 = 100_000_000_000_000_000;
 
-// PoolState size for zero_copy:
-// 32 + 32 + 32 + 32 + 8 + 8 + 8 + 1 + 1 + 1 + 1 + 4 + (32*8) + (32*8) = 672
-pub const POOL_STATE_SIZE: usize = 672;
 
 // ── Seeds ──────────────────────────────────────────────────────────────────────
 
@@ -51,7 +48,7 @@ pub mod memeland_airdrop {
             ErrorCode::StartTimeInPast
         );
         
-        let pool = &mut ctx.accounts.pool_state.load_init()?;
+        let pool = &mut ctx.accounts.pool_state;
         pool.admin = ctx.accounts.admin.key();
         pool.token_mint = ctx.accounts.token_mint.key();
         pool.pool_token_account = ctx.accounts.pool_token_account.key();
@@ -94,7 +91,7 @@ pub mod memeland_airdrop {
         amount: u64,
         proof: Vec<[u8; 32]>,
     ) -> Result<()> {
-        let pool = &mut ctx.accounts.pool_state.load_mut()?;
+        let pool = &mut ctx.accounts.pool_state;
         let clock = Clock::get()?;
 
         require!(pool.paused == 0, ErrorCode::PoolPaused);
@@ -164,7 +161,7 @@ pub mod memeland_airdrop {
     /// Records total_staked for the current day.
     /// Claims/unstakes are blocked until the previous day's snapshot is taken.
     pub fn snapshot(ctx: Context<Snapshot>) -> Result<()> {
-        let pool = &mut ctx.accounts.pool_state.load_mut()?;
+        let pool = &mut ctx.accounts.pool_state;
         let clock = Clock::get()?;
 
         require!(pool.paused == 0, ErrorCode::PoolPaused);
@@ -212,7 +209,8 @@ pub mod memeland_airdrop {
     /// Blocked if previous day's snapshot hasn't been taken yet.
     /// Closes the UserStake account and returns rent to user.
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
-        let pool = &mut ctx.accounts.pool_state.load_mut()?;
+        let pool_state_key = ctx.accounts.pool_state.key();
+        let pool = &mut ctx.accounts.pool_state;
         let user_stake = &ctx.accounts.user_stake;
         let clock = Clock::get()?;
 
@@ -247,7 +245,6 @@ pub mod memeland_airdrop {
             .unwrap();
 
         // Transfer tokens via PDA signer
-        let pool_state_key = ctx.accounts.pool_state.key();
         let seeds = &[
             seeds::POOL_TOKEN,
             pool_state_key.as_ref(),
@@ -287,7 +284,8 @@ pub mod memeland_airdrop {
 
     /// Admin terminates pool. Caps rewards, returns surplus to admin.
     pub fn terminate_pool(ctx: Context<TerminatePool>) -> Result<()> {
-        let pool = &mut ctx.accounts.pool_state.load_mut()?;
+        let pool_state_key = ctx.accounts.pool_state.key();
+        let pool = &mut ctx.accounts.pool_state;
 
         require!(pool.terminated == 0, ErrorCode::AlreadyTerminated);
 
@@ -306,7 +304,6 @@ pub mod memeland_airdrop {
         let drainable = pool_balance.saturating_sub(reserved);
 
         if drainable > 0 {
-            let pool_state_key = ctx.accounts.pool_state.key();
             let seeds = &[
                 seeds::POOL_TOKEN,
                 pool_state_key.as_ref(),
@@ -339,7 +336,7 @@ pub mod memeland_airdrop {
     /// For future days, uses the last snapshot's total_staked.
     /// Note: After unstake, UserStake is closed so this instruction will fail (account not found).
     pub fn calculate_rewards(ctx: Context<CalculateRewards>, day: u64) -> Result<()> {
-        let pool = &ctx.accounts.pool_state.load()?;
+        let pool = &ctx.accounts.pool_state;
         let user_stake = &ctx.accounts.user_stake;
 
         require!(day < TOTAL_DAYS, ErrorCode::InvalidDay);
@@ -381,7 +378,8 @@ pub mod memeland_airdrop {
     /// After exit window, admin can recover unclaimed rewards (not user principal).
     /// User principal remains protected - users can still unstake after this.
     pub fn recover_expired_tokens(ctx: Context<RecoverExpiredTokens>) -> Result<()> {
-        let pool = &mut ctx.accounts.pool_state.load_mut()?;
+        let pool_state_key = ctx.accounts.pool_state.key();
+        let pool = &mut ctx.accounts.pool_state;
         let clock = Clock::get()?;
 
         require!(
@@ -394,7 +392,6 @@ pub mod memeland_airdrop {
         let amount = pool_balance.saturating_sub(pool.total_staked);
         require!(amount > 0, ErrorCode::NothingToRecover);
 
-        let pool_state_key = ctx.accounts.pool_state.key();
         let seeds = &[
             seeds::POOL_TOKEN,
             pool_state_key.as_ref(),
@@ -424,20 +421,17 @@ pub mod memeland_airdrop {
     /// Close pool state and token accounts, return rent to admin.
     /// Only allowed after pool is terminated AND all users have unstaked.
     pub fn close_pool(ctx: Context<ClosePool>) -> Result<()> {
-        let pool = ctx.accounts.pool_state.load()?;
+        let pool = &ctx.accounts.pool_state;
 
         require!(pool.terminated == 1, ErrorCode::PoolNotTerminated);
         require!(pool.total_staked == 0, ErrorCode::PoolNotEmpty);
-
-        let pool_token_bump = pool.pool_token_bump;
-        drop(pool); // Release borrow before closing
 
         // Close the pool token account (SPL close_account CPI)
         let pool_state_key = ctx.accounts.pool_state.key();
         let seeds = &[
             seeds::POOL_TOKEN,
             pool_state_key.as_ref(),
-            &[pool_token_bump],
+            &[pool.pool_token_bump],
         ];
         let signer_seeds = &[&seeds[..]];
 
@@ -452,32 +446,18 @@ pub mod memeland_airdrop {
         );
         token::close_account(close_ctx)?;
 
-        // Close pool_state (zero_copy account - manual lamport transfer)
-        let pool_state_info = ctx.accounts.pool_state.to_account_info();
-        let admin_info = ctx.accounts.admin.to_account_info();
+        // pool_state is closed by Anchor's `close = admin` constraint
 
-        let pool_lamports = pool_state_info.lamports();
-        **pool_state_info.try_borrow_mut_lamports()? = 0;
-        **admin_info.try_borrow_mut_lamports()? = admin_info
-            .lamports()
-            .checked_add(pool_lamports)
-            .unwrap();
+        emit!(PoolClosed {});
 
-        emit!(PoolClosed {
-            lamports_returned: pool_lamports,
-        });
-
-        msg!(
-            "Pool closed. Rent returned to admin: {} lamports from pool_state + token account rent.",
-            pool_lamports
-        );
+        msg!("Pool closed. Rent returned to admin.");
         Ok(())
     }
 
     /// Emergency pause - blocks claims and snapshots.
     /// Users can still unstake to protect their funds.
     pub fn pause_pool(ctx: Context<PausePool>) -> Result<()> {
-        let pool = &mut ctx.accounts.pool_state.load_mut()?;
+        let pool = &mut ctx.accounts.pool_state;
 
         require!(pool.paused == 0, ErrorCode::AlreadyPaused);
         require!(pool.terminated == 0, ErrorCode::PoolTerminated);
@@ -494,7 +474,7 @@ pub mod memeland_airdrop {
 
     /// Unpause pool - resumes normal operations.
     pub fn unpause_pool(ctx: Context<PausePool>) -> Result<()> {
-        let pool = &mut ctx.accounts.pool_state.load_mut()?;
+        let pool = &mut ctx.accounts.pool_state;
 
         require!(pool.paused == 1, ErrorCode::PoolNotPaused);
         require!(pool.terminated == 0, ErrorCode::PoolTerminated);
@@ -596,11 +576,11 @@ pub struct InitializePool<'info> {
     #[account(
         init,
         payer = admin,
-        space = 8 + POOL_STATE_SIZE,
+        space = 8 + PoolState::INIT_SPACE,
         seeds = [seeds::POOL_STATE, token_mint.key().as_ref()],
         bump,
     )]
-    pub pool_state: AccountLoader<'info, PoolState>,
+    pub pool_state: Account<'info, PoolState>,
 
     /// The token mint for this staking pool
     pub token_mint: Account<'info, Mint>,
@@ -626,7 +606,7 @@ pub struct ClaimAirdrop<'info> {
     pub user: Signer<'info>,
 
     #[account(mut)]
-    pub pool_state: AccountLoader<'info, PoolState>,
+    pub pool_state: Account<'info, PoolState>,
 
     /// Permanent marker that prevents re-claiming (tiny, ~0.001 SOL)
     /// This account exists forever to prevent claim-unstake-reclaim attacks
@@ -657,7 +637,7 @@ pub struct Snapshot<'info> {
     pub signer: Signer<'info>,
 
     #[account(mut)]
-    pub pool_state: AccountLoader<'info, PoolState>,
+    pub pool_state: Account<'info, PoolState>,
 }
 
 #[derive(Accounts)]
@@ -666,7 +646,7 @@ pub struct Unstake<'info> {
     pub user: Signer<'info>,
 
     #[account(mut)]
-    pub pool_state: AccountLoader<'info, PoolState>,
+    pub pool_state: Account<'info, PoolState>,
 
     /// User's stake account - will be closed and rent returned
     #[account(
@@ -681,14 +661,14 @@ pub struct Unstake<'info> {
     /// Pool's token account - must match the one stored in pool_state
     #[account(
         mut,
-        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
+        constraint = pool_token_account.key() == pool_state.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
     )]
     pub pool_token_account: Account<'info, TokenAccount>,
 
     /// User's token account to receive principal + rewards
     #[account(
         mut,
-        token::mint = pool_state.load()?.token_mint,
+        token::mint = pool_state.token_mint,
         token::authority = user,
     )]
     pub user_token_account: Account<'info, TokenAccount>,
@@ -700,24 +680,24 @@ pub struct Unstake<'info> {
 pub struct TerminatePool<'info> {
     /// Must be the pool admin to terminate
     #[account(
-        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::UnauthorizedAdmin,
+        constraint = admin.key() == pool_state.admin @ ErrorCode::UnauthorizedAdmin,
     )]
     pub admin: Signer<'info>,
 
     #[account(mut)]
-    pub pool_state: AccountLoader<'info, PoolState>,
+    pub pool_state: Account<'info, PoolState>,
 
     /// Pool's token account - must match the one stored in pool_state
     #[account(
         mut,
-        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
+        constraint = pool_token_account.key() == pool_state.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
     )]
     pub pool_token_account: Account<'info, TokenAccount>,
 
     /// Admin's token account to receive drained tokens
     #[account(
         mut,
-        token::mint = pool_state.load()?.token_mint,
+        token::mint = pool_state.token_mint,
         token::authority = admin,
     )]
     pub admin_token_account: Account<'info, TokenAccount>,
@@ -727,7 +707,7 @@ pub struct TerminatePool<'info> {
 
 #[derive(Accounts)]
 pub struct CalculateRewards<'info> {
-    pub pool_state: AccountLoader<'info, PoolState>,
+    pub pool_state: Account<'info, PoolState>,
 
     /// User's stake account - read-only for reward calculation
     #[account(
@@ -742,17 +722,20 @@ pub struct ClosePool<'info> {
     /// Must be the pool admin to close
     #[account(
         mut,
-        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::UnauthorizedAdmin,
+        constraint = admin.key() == pool_state.admin @ ErrorCode::UnauthorizedAdmin,
     )]
     pub admin: Signer<'info>,
 
-    #[account(mut)]
-    pub pool_state: AccountLoader<'info, PoolState>,
+    #[account(
+        mut,
+        close = admin,
+    )]
+    pub pool_state: Account<'info, PoolState>,
 
     /// Pool's token account - must match and have zero balance to close
     #[account(
         mut,
-        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
+        constraint = pool_token_account.key() == pool_state.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
     )]
     pub pool_token_account: Account<'info, TokenAccount>,
 
@@ -763,24 +746,24 @@ pub struct ClosePool<'info> {
 pub struct RecoverExpiredTokens<'info> {
     /// Must be the pool admin to recover tokens
     #[account(
-        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::UnauthorizedAdmin,
+        constraint = admin.key() == pool_state.admin @ ErrorCode::UnauthorizedAdmin,
     )]
     pub admin: Signer<'info>,
 
     #[account(mut)]
-    pub pool_state: AccountLoader<'info, PoolState>,
+    pub pool_state: Account<'info, PoolState>,
 
     /// Pool's token account - must match the one stored in pool_state
     #[account(
         mut,
-        constraint = pool_token_account.key() == pool_state.load()?.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
+        constraint = pool_token_account.key() == pool_state.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
     )]
     pub pool_token_account: Account<'info, TokenAccount>,
 
     /// Admin's token account to receive recovered tokens
     #[account(
         mut,
-        token::mint = pool_state.load()?.token_mint,
+        token::mint = pool_state.token_mint,
         token::authority = admin,
     )]
     pub admin_token_account: Account<'info, TokenAccount>,
@@ -792,20 +775,20 @@ pub struct RecoverExpiredTokens<'info> {
 pub struct PausePool<'info> {
     /// Must be the pool admin to pause/unpause
     #[account(
-        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::UnauthorizedAdmin,
+        constraint = admin.key() == pool_state.admin @ ErrorCode::UnauthorizedAdmin,
     )]
     pub admin: Signer<'info>,
 
     #[account(mut)]
-    pub pool_state: AccountLoader<'info, PoolState>,
+    pub pool_state: Account<'info, PoolState>,
 }
 
 
 // ── State ──────────────────────────────────────────────────────────────────────
 
-/// Pool state using zero_copy to avoid stack overflow.
-#[account(zero_copy(unsafe))]
-#[repr(C)]
+/// Pool state for the staking program.
+#[account]
+#[derive(InitSpace)]
 pub struct PoolState {
     pub admin: Pubkey,                    // 32
     pub token_mint: Pubkey,               // 32
@@ -819,10 +802,9 @@ pub struct PoolState {
     pub bump: u8,                         // 1
     pub pool_token_bump: u8,              // 1
     pub paused: u8,                       // 1  (0 = active, 1 = paused)
-    pub _padding: [u8; 3],                // 3  (align to 8 bytes)
     pub daily_rewards: [u64; 32],         // 256 (only 0..20 used)
     pub daily_snapshots: [u64; 32],       // 256 (only 0..20 used)
-}                                         // Total: 672
+}
 
 /// Permanent marker that prevents re-claiming after unstake.
 /// Tiny account (~0.001 SOL rent) that stays forever.
@@ -882,9 +864,7 @@ pub struct TokensRecovered {
 }
 
 #[event]
-pub struct PoolClosed {
-    pub lamports_returned: u64,
-}
+pub struct PoolClosed {}
 
 #[event]
 pub struct PoolPausedEvent {
