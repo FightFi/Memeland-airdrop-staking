@@ -904,6 +904,8 @@ pub enum ErrorCode {
     PoolNotEmpty,
     #[msg("Daily rewards must sum to exactly STAKING_POOL (100M tokens)")]
     InvalidDailyRewards,
+    #[msg("Daily rewards must be in ascending order")]
+    InvalidDailyRewardsOrder,
     #[msg("Pool is paused - operations temporarily disabled")]
     PoolPaused,
     #[msg("Pool is not paused - cannot unpause")]
