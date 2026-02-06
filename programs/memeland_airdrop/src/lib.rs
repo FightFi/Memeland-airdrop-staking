@@ -427,7 +427,14 @@ pub mod memeland_airdrop {
         let pool = &ctx.accounts.pool_state;
 
         require!(pool.terminated == 1, ErrorCode::PoolNotTerminated);
-        require!(pool.total_staked == 0, ErrorCode::PoolNotEmpty);
+        // If there are still staked tokens, check if the program has expired
+        let clock = Clock::get()?;
+        if pool.total_staked > 0 {
+            require!(
+                clock.unix_timestamp > exit_deadline(pool.start_time),
+                ErrorCode::PoolNotEmpty
+            ); 
+        }
 
         // Close the pool token account (SPL close_account CPI)
         let pool_state_key = ctx.accounts.pool_state.key();
