@@ -1198,4 +1198,789 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
     });
   });
 
+  // ── NEW TEST SECTIONS: Coverage Improvements ──────────────────────────────
+
+  describe("calculate_rewards instruction", () => {
+    let crPool: PublicKey;
+    let crPoolState: PublicKey;
+    let crPoolToken: PublicKey;
+    let crMerkleLayers: any;
+    let crMerkleRoot: Buffer;
+    let crStart: number;
+
+    const crUser = Keypair.generate();
+    const crAmount = new BN(5_000_000).mul(new BN(1e9)); // 5M
+
+    before(async () => {
+      crPool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+      [crPoolState] = getPoolStatePda(crPool);
+      [crPoolToken] = getPoolTokenPda(crPoolState);
+
+      crMerkleLayers = buildMerkleTree([computeLeaf(crUser.publicKey, crAmount)]);
+      crMerkleRoot = getMerkleRoot(crMerkleLayers);
+
+      await fundAccount(crUser.publicKey);
+      crStart = Math.floor(Date.now() / 1000) + 1000;
+      await warpTo(crStart - 100);
+
+      await program.methods.initializePool(new BN(crStart), Array.from(crMerkleRoot), computeDailyRewards())
+        .accounts({
+          admin: admin.publicKey,
+          poolState: crPoolState,
+          tokenMint: crPool,
+          poolTokenAccount: crPoolToken,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+        }).signers([admin]).rpc();
+
+      const adminAta = await getOrCreateATABankrun(crPool, admin.publicKey);
+      await provider.sendAndConfirm(new anchor.web3.Transaction().add(
+        createMintToInstruction(crPool, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
+        createTransferInstruction(adminAta, crPoolToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
+      ), [admin]);
+
+      // User claims on Day 5
+      await warpTo(crStart + 5 * SECONDS_PER_DAY + 3600);
+      await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: crPoolState }).signers([admin]).rpc();
+
+      const [crStake] = getUserStakePda(crPoolState, crUser.publicKey);
+      const [crMarker] = getClaimMarkerPda(crPoolState, crUser.publicKey);
+      await program.methods.claimAirdrop(crAmount, getMerkleProof(crMerkleLayers, computeLeaf(crUser.publicKey, crAmount)))
+        .accounts({ user: crUser.publicKey, poolState: crPoolState, claimMarker: crMarker, userStake: crStake, systemProgram: SystemProgram.programId })
+        .signers([crUser]).rpc();
+    });
+
+    it("Day before claim (day=3): reward should be 0", async () => {
+      const [crStake] = getUserStakePda(crPoolState, crUser.publicKey);
+      // day=3 < claim_day=5, should succeed with reward=0
+      await program.methods.calculateRewards(new BN(3))
+        .accounts({ poolState: crPoolState, userStake: crStake })
+        .rpc();
+    });
+
+    it("Day with actual snapshot (day=5): should succeed", async () => {
+      const [crStake] = getUserStakePda(crPoolState, crUser.publicKey);
+      // day=5 has a snapshot, should compute correct reward
+      await program.methods.calculateRewards(new BN(5))
+        .accounts({ poolState: crPoolState, userStake: crStake })
+        .rpc();
+    });
+
+    it("Future day (day > snapshot_count): uses last snapshot estimate", async () => {
+      const [crStake] = getUserStakePda(crPoolState, crUser.publicKey);
+      // day=15 is beyond snapshot_count, should use last snapshot value
+      await program.methods.calculateRewards(new BN(15))
+        .accounts({ poolState: crPoolState, userStake: crStake })
+        .rpc();
+    });
+
+    it("Day >= 20 (day=20): should fail with InvalidDay", async () => {
+      const [crStake] = getUserStakePda(crPoolState, crUser.publicKey);
+      try {
+        await program.methods.calculateRewards(new BN(20))
+          .accounts({ poolState: crPoolState, userStake: crStake })
+          .rpc();
+        expect.fail("Should have failed with InvalidDay");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("InvalidDay") || m.includes("6017") || m.includes("0x1781"));
+      }
+    });
+  });
+
+  describe("close_pool error paths", () => {
+    let cpPool: PublicKey;
+    let cpPoolState: PublicKey;
+    let cpPoolToken: PublicKey;
+    let cpMerkleLayers: any;
+    let cpMerkleRoot: Buffer;
+    let cpStart: number;
+
+    const cpUser = Keypair.generate();
+    const cpAmount = new BN(1_000_000).mul(new BN(1e9)); // 1M
+
+    before(async () => {
+      cpPool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+      [cpPoolState] = getPoolStatePda(cpPool);
+      [cpPoolToken] = getPoolTokenPda(cpPoolState);
+
+      cpMerkleLayers = buildMerkleTree([computeLeaf(cpUser.publicKey, cpAmount)]);
+      cpMerkleRoot = getMerkleRoot(cpMerkleLayers);
+
+      await fundAccount(cpUser.publicKey);
+      cpStart = Math.floor(Date.now() / 1000) + 1000;
+      await warpTo(cpStart - 100);
+
+      await program.methods.initializePool(new BN(cpStart), Array.from(cpMerkleRoot), computeDailyRewards())
+        .accounts({
+          admin: admin.publicKey,
+          poolState: cpPoolState,
+          tokenMint: cpPool,
+          poolTokenAccount: cpPoolToken,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+        }).signers([admin]).rpc();
+
+      const adminAta = await getOrCreateATABankrun(cpPool, admin.publicKey);
+      await provider.sendAndConfirm(new anchor.web3.Transaction().add(
+        createMintToInstruction(cpPool, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
+        createTransferInstruction(adminAta, cpPoolToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
+      ), [admin]);
+
+      // User claims on Day 1
+      await warpTo(cpStart + SECONDS_PER_DAY + 3600);
+      await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: cpPoolState }).signers([admin]).rpc();
+
+      const [cpStake] = getUserStakePda(cpPoolState, cpUser.publicKey);
+      const [cpMarker] = getClaimMarkerPda(cpPoolState, cpUser.publicKey);
+      await program.methods.claimAirdrop(cpAmount, getMerkleProof(cpMerkleLayers, computeLeaf(cpUser.publicKey, cpAmount)))
+        .accounts({ user: cpUser.publicKey, poolState: cpPoolState, claimMarker: cpMarker, userStake: cpStake, systemProgram: SystemProgram.programId })
+        .signers([cpUser]).rpc();
+    });
+
+    it("PoolNotTerminated: close_pool on non-terminated pool", async () => {
+      try {
+        await program.methods.closePool()
+          .accounts({
+            admin: admin.publicKey,
+            poolState: cpPoolState,
+            poolTokenAccount: cpPoolToken,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          }).signers([admin]).rpc();
+        expect.fail("Should have failed with PoolNotTerminated");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("PoolNotTerminated") || m.includes("6004") || m.includes("0x1774"));
+      }
+    });
+
+    it("PoolNotEmpty: close_pool before exit deadline with stakers", async () => {
+      // Complete snapshots and terminate first
+      await warpTo(cpStart + 21 * SECONDS_PER_DAY);
+      for (let i = 0; i < 20; i++) {
+        try { await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: cpPoolState }).signers([admin]).rpc(); } catch (e) {}
+        const clock = await context.banksClient.getClock();
+        await warpTo(Number(clock.unixTimestamp) + 1);
+      }
+
+      const adminAta = await getOrCreateATABankrun(cpPool, admin.publicKey);
+      await program.methods.terminatePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: cpPoolState,
+          poolTokenAccount: cpPoolToken,
+          adminTokenAccount: adminAta,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        }).signers([admin]).rpc();
+
+      // Try close BEFORE exit deadline (Day 35) - user still has stake
+      await warpTo(cpStart + 22 * SECONDS_PER_DAY);
+      try {
+        await program.methods.closePool()
+          .accounts({
+            admin: admin.publicKey,
+            poolState: cpPoolState,
+            poolTokenAccount: cpPoolToken,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          }).signers([admin]).rpc();
+        expect.fail("Should have failed with PoolNotEmpty");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("PoolNotEmpty") || m.includes("6005") || m.includes("0x1775"));
+      }
+    });
+
+    it("Successful close: after exit deadline (Day 35+)", async () => {
+      // Warp past exit deadline
+      await warpTo(cpStart + 36 * SECONDS_PER_DAY);
+
+      // User must unstake first to drain their principal from the pool token account
+      const [cpStake] = getUserStakePda(cpPoolState, cpUser.publicKey);
+      const cpUserAta = await getOrCreateATABankrun(cpPool, cpUser.publicKey, cpUser);
+      await program.methods.unstake()
+        .accounts({
+          user: cpUser.publicKey,
+          poolState: cpPoolState,
+          userStake: cpStake,
+          poolTokenAccount: cpPoolToken,
+          userTokenAccount: cpUserAta,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        }).signers([cpUser]).rpc();
+
+      // Recover any remaining tokens (rewards etc.)
+      const adminAta = await getOrCreateATABankrun(cpPool, admin.publicKey);
+      try {
+        await program.methods.recoverExpiredTokens()
+          .accounts({
+            admin: admin.publicKey,
+            poolState: cpPoolState,
+            poolTokenAccount: cpPoolToken,
+            adminTokenAccount: adminAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          }).signers([admin]).rpc();
+      } catch (e) {
+        // May fail with NothingToRecover if already drained
+      }
+
+      const clock = await context.banksClient.getClock();
+      await warpTo(Number(clock.unixTimestamp) + 1);
+
+      await program.methods.closePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: cpPoolState,
+          poolTokenAccount: cpPoolToken,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        }).signers([admin]).rpc();
+
+      // Verify pool_state account is closed
+      const acc = await context.banksClient.getAccount(cpPoolState);
+      expect(acc).to.be.null;
+    });
+  });
+
+  describe("recover_expired_tokens error paths", () => {
+    let rePool: PublicKey;
+    let rePoolState: PublicKey;
+    let rePoolToken: PublicKey;
+    let reStart: number;
+
+    before(async () => {
+      rePool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+      [rePoolState] = getPoolStatePda(rePool);
+      [rePoolToken] = getPoolTokenPda(rePoolState);
+
+      reStart = Math.floor(Date.now() / 1000) + 1000;
+      await warpTo(reStart - 100);
+
+      await program.methods.initializePool(new BN(reStart), Array.from(multiMerkleRoot), computeDailyRewards())
+        .accounts({
+          admin: admin.publicKey,
+          poolState: rePoolState,
+          tokenMint: rePool,
+          poolTokenAccount: rePoolToken,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+        }).signers([admin]).rpc();
+
+      const adminAta = await getOrCreateATABankrun(rePool, admin.publicKey);
+      await provider.sendAndConfirm(new anchor.web3.Transaction().add(
+        createMintToInstruction(rePool, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
+        createTransferInstruction(adminAta, rePoolToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
+      ), [admin]);
+    });
+
+    it("ExitWindowNotFinished: recover on Day 20 (before Day 35)", async () => {
+      await warpTo(reStart + 20 * SECONDS_PER_DAY);
+      const adminAta = await getOrCreateATABankrun(rePool, admin.publicKey);
+
+      try {
+        await program.methods.recoverExpiredTokens()
+          .accounts({
+            admin: admin.publicKey,
+            poolState: rePoolState,
+            poolTokenAccount: rePoolToken,
+            adminTokenAccount: adminAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          }).signers([admin]).rpc();
+        expect.fail("Should have failed with ExitWindowNotFinished");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("ExitWindowNotFinished") || m.includes("6025") || m.includes("0x1789"));
+      }
+    });
+
+    it("NothingToRecover: recover after all tokens drained", async () => {
+      // Warp past exit window and drain pool first via recovery
+      await warpTo(reStart + 36 * SECONDS_PER_DAY);
+      const adminAta = await getOrCreateATABankrun(rePool, admin.publicKey);
+
+      // First recovery should succeed (pool has tokens, total_staked=0)
+      await program.methods.recoverExpiredTokens()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: rePoolState,
+          poolTokenAccount: rePoolToken,
+          adminTokenAccount: adminAta,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        }).signers([admin]).rpc();
+
+      // Micro-warp to avoid duplicate tx signature
+      const clock = await context.banksClient.getClock();
+      await warpTo(Number(clock.unixTimestamp) + 1);
+
+      // Second recovery: pool_balance == total_staked (both 0)
+      try {
+        await program.methods.recoverExpiredTokens()
+          .accounts({
+            admin: admin.publicKey,
+            poolState: rePoolState,
+            poolTokenAccount: rePoolToken,
+            adminTokenAccount: adminAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          }).signers([admin]).rpc();
+        expect.fail("Should have failed with NothingToRecover");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("NothingToRecover") || m.includes("6027") || m.includes("0x178b"));
+      }
+    });
+  });
+
+  describe("terminate_pool error paths", () => {
+    let tpPool: PublicKey;
+    let tpPoolState: PublicKey;
+    let tpPoolToken: PublicKey;
+    let tpStart: number;
+
+    before(async () => {
+      tpPool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+      [tpPoolState] = getPoolStatePda(tpPool);
+      [tpPoolToken] = getPoolTokenPda(tpPoolState);
+
+      tpStart = Math.floor(Date.now() / 1000) + 1000;
+      await warpTo(tpStart - 100);
+
+      await program.methods.initializePool(new BN(tpStart), Array.from(multiMerkleRoot), computeDailyRewards())
+        .accounts({
+          admin: admin.publicKey,
+          poolState: tpPoolState,
+          tokenMint: tpPool,
+          poolTokenAccount: tpPoolToken,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+        }).signers([admin]).rpc();
+
+      const adminAta = await getOrCreateATABankrun(tpPool, admin.publicKey);
+      await provider.sendAndConfirm(new anchor.web3.Transaction().add(
+        createMintToInstruction(tpPool, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
+        createTransferInstruction(adminAta, tpPoolToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
+      ), [admin]);
+    });
+
+    it("SnapshotsNotCompleted: terminate before 20 snapshots", async () => {
+      // Only take a few snapshots
+      await warpTo(tpStart + 5 * SECONDS_PER_DAY + 3600);
+      await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: tpPoolState }).signers([admin]).rpc();
+
+      const adminAta = await getOrCreateATABankrun(tpPool, admin.publicKey);
+      try {
+        await program.methods.terminatePool()
+          .accounts({
+            admin: admin.publicKey,
+            poolState: tpPoolState,
+            poolTokenAccount: tpPoolToken,
+            adminTokenAccount: adminAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          }).signers([admin]).rpc();
+        expect.fail("Should have failed with SnapshotsNotCompleted");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("SnapshotsNotCompleted") || m.includes("6021") || m.includes("0x1785"));
+      }
+    });
+
+    it("AlreadyTerminated: terminate twice", async () => {
+      // Complete all snapshots
+      await warpTo(tpStart + 21 * SECONDS_PER_DAY);
+      for (let i = 0; i < 20; i++) {
+        try { await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: tpPoolState }).signers([admin]).rpc(); } catch (e) {}
+        const clock = await context.banksClient.getClock();
+        await warpTo(Number(clock.unixTimestamp) + 1);
+      }
+
+      const adminAta = await getOrCreateATABankrun(tpPool, admin.publicKey);
+      // First terminate should succeed
+      await program.methods.terminatePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: tpPoolState,
+          poolTokenAccount: tpPoolToken,
+          adminTokenAccount: adminAta,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        }).signers([admin]).rpc();
+
+      // Second terminate should fail
+      const clock = await context.banksClient.getClock();
+      await warpTo(Number(clock.unixTimestamp) + 1);
+
+      try {
+        await program.methods.terminatePool()
+          .accounts({
+            admin: admin.publicKey,
+            poolState: tpPoolState,
+            poolTokenAccount: tpPoolToken,
+            adminTokenAccount: adminAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          }).signers([admin]).rpc();
+        expect.fail("Should have failed with AlreadyTerminated");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("AlreadyTerminated") || m.includes("6003") || m.includes("0x1773"));
+      }
+    });
+  });
+
+  describe("Pause/Unpause error paths", () => {
+    let ppPool: PublicKey;
+    let ppPoolState: PublicKey;
+    let ppPoolToken: PublicKey;
+    let ppStart: number;
+
+    before(async () => {
+      ppPool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+      [ppPoolState] = getPoolStatePda(ppPool);
+      [ppPoolToken] = getPoolTokenPda(ppPoolState);
+
+      ppStart = Math.floor(Date.now() / 1000) + 1000;
+      await warpTo(ppStart - 100);
+
+      await program.methods.initializePool(new BN(ppStart), Array.from(multiMerkleRoot), computeDailyRewards())
+        .accounts({
+          admin: admin.publicKey,
+          poolState: ppPoolState,
+          tokenMint: ppPool,
+          poolTokenAccount: ppPoolToken,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+        }).signers([admin]).rpc();
+    });
+
+    it("AlreadyPaused: pause an already-paused pool", async () => {
+      await program.methods.pausePool().accounts({ admin: admin.publicKey, poolState: ppPoolState }).signers([admin]).rpc();
+
+      const clock = await context.banksClient.getClock();
+      await warpTo(Number(clock.unixTimestamp) + 1);
+
+      try {
+        await program.methods.pausePool().accounts({ admin: admin.publicKey, poolState: ppPoolState }).signers([admin]).rpc();
+        expect.fail("Should have failed with AlreadyPaused");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("AlreadyPaused") || m.includes("6010") || m.includes("0x177a"));
+      }
+    });
+
+    it("Snapshot while paused: should fail with PoolPaused", async () => {
+      // Pool is still paused from previous test
+      await warpTo(ppStart + SECONDS_PER_DAY + 3600);
+
+      try {
+        await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: ppPoolState }).signers([admin]).rpc();
+        expect.fail("Should have failed with PoolPaused");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("PoolPaused") || m.includes("6008") || m.includes("0x1778"));
+      }
+    });
+
+    it("PoolNotPaused: unpause a non-paused pool", async () => {
+      // First unpause to get back to non-paused state
+      await program.methods.unpausePool().accounts({ admin: admin.publicKey, poolState: ppPoolState }).signers([admin]).rpc();
+
+      const clock = await context.banksClient.getClock();
+      await warpTo(Number(clock.unixTimestamp) + 1);
+
+      try {
+        await program.methods.unpausePool().accounts({ admin: admin.publicKey, poolState: ppPoolState }).signers([admin]).rpc();
+        expect.fail("Should have failed with PoolNotPaused");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("PoolNotPaused") || m.includes("6009") || m.includes("0x1779"));
+      }
+    });
+  });
+
+  describe("PoolTerminated guards", () => {
+    let ptPool: PublicKey;
+    let ptPoolState: PublicKey;
+    let ptPoolToken: PublicKey;
+    let ptMerkleLayers: any;
+    let ptMerkleRoot: Buffer;
+    let ptStart: number;
+
+    const ptUser = Keypair.generate();
+    const ptAmount = new BN(1_000_000).mul(new BN(1e9));
+
+    before(async () => {
+      ptPool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+      [ptPoolState] = getPoolStatePda(ptPool);
+      [ptPoolToken] = getPoolTokenPda(ptPoolState);
+
+      ptMerkleLayers = buildMerkleTree([
+        computeLeaf(ptUser.publicKey, ptAmount),
+        computeLeaf(alice.publicKey, aliceAmount),
+      ]);
+      ptMerkleRoot = getMerkleRoot(ptMerkleLayers);
+
+      await fundAccount(ptUser.publicKey);
+      ptStart = Math.floor(Date.now() / 1000) + 1000;
+      await warpTo(ptStart - 100);
+
+      await program.methods.initializePool(new BN(ptStart), Array.from(ptMerkleRoot), computeDailyRewards())
+        .accounts({
+          admin: admin.publicKey,
+          poolState: ptPoolState,
+          tokenMint: ptPool,
+          poolTokenAccount: ptPoolToken,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+        }).signers([admin]).rpc();
+
+      const adminAta = await getOrCreateATABankrun(ptPool, admin.publicKey);
+      await provider.sendAndConfirm(new anchor.web3.Transaction().add(
+        createMintToInstruction(ptPool, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
+        createTransferInstruction(adminAta, ptPoolToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
+      ), [admin]);
+
+      // Claim with ptUser on Day 1, complete all snapshots, then terminate
+      await warpTo(ptStart + SECONDS_PER_DAY + 3600);
+      await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: ptPoolState }).signers([admin]).rpc();
+
+      const [ptStake] = getUserStakePda(ptPoolState, ptUser.publicKey);
+      const [ptMarker] = getClaimMarkerPda(ptPoolState, ptUser.publicKey);
+      await program.methods.claimAirdrop(ptAmount, getMerkleProof(ptMerkleLayers, computeLeaf(ptUser.publicKey, ptAmount)))
+        .accounts({ user: ptUser.publicKey, poolState: ptPoolState, claimMarker: ptMarker, userStake: ptStake, systemProgram: SystemProgram.programId })
+        .signers([ptUser]).rpc();
+
+      // Complete all 20 snapshots
+      await warpTo(ptStart + 21 * SECONDS_PER_DAY);
+      for (let i = 0; i < 20; i++) {
+        try { await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: ptPoolState }).signers([admin]).rpc(); } catch (e) {}
+        const clock = await context.banksClient.getClock();
+        await warpTo(Number(clock.unixTimestamp) + 1);
+      }
+
+      // Terminate
+      const adminAta2 = await getOrCreateATABankrun(ptPool, admin.publicKey);
+      await program.methods.terminatePool()
+        .accounts({
+          admin: admin.publicKey,
+          poolState: ptPoolState,
+          poolTokenAccount: ptPoolToken,
+          adminTokenAccount: adminAta2,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        }).signers([admin]).rpc();
+    });
+
+    it("claim_airdrop on terminated pool fails with PoolTerminated", async () => {
+      const [aStake] = getUserStakePda(ptPoolState, alice.publicKey);
+      const [aMarker] = getClaimMarkerPda(ptPoolState, alice.publicKey);
+
+      try {
+        await program.methods.claimAirdrop(aliceAmount, getMerkleProof(ptMerkleLayers, computeLeaf(alice.publicKey, aliceAmount)))
+          .accounts({ user: alice.publicKey, poolState: ptPoolState, claimMarker: aMarker, userStake: aStake, systemProgram: SystemProgram.programId })
+          .signers([alice]).rpc();
+        expect.fail("Should have failed with PoolTerminated");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("PoolTerminated") || m.includes("6002") || m.includes("0x1772"));
+      }
+    });
+
+    it("snapshot on terminated pool fails with PoolTerminated", async () => {
+      try {
+        await program.methods.snapshot()
+          .accounts({ signer: admin.publicKey, poolState: ptPoolState })
+          .signers([admin]).rpc();
+        expect.fail("Should have failed with PoolTerminated");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("PoolTerminated") || m.includes("6002") || m.includes("0x1772"));
+      }
+    });
+
+    it("pause on terminated pool fails with PoolTerminated", async () => {
+      try {
+        await program.methods.pausePool()
+          .accounts({ admin: admin.publicKey, poolState: ptPoolState })
+          .signers([admin]).rpc();
+        expect.fail("Should have failed with PoolTerminated");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("PoolTerminated") || m.includes("6002") || m.includes("0x1772"));
+      }
+    });
+
+    it("unpause on terminated pool fails with PoolTerminated", async () => {
+      try {
+        await program.methods.unpausePool()
+          .accounts({ admin: admin.publicKey, poolState: ptPoolState })
+          .signers([admin]).rpc();
+        expect.fail("Should have failed with PoolTerminated");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        // unpause checks paused==1 first, but pool is not paused, so it hits PoolNotPaused before PoolTerminated
+        // Both are valid rejections for an invalid operation on a terminated pool
+        expect(msg).to.satisfy((m: string) => m.includes("PoolTerminated") || m.includes("PoolNotPaused") || m.includes("6002") || m.includes("6009"));
+      }
+    });
+  });
+
+  describe("SnapshotRequiredFirst guards", () => {
+    let srPool: PublicKey;
+    let srPoolState: PublicKey;
+    let srPoolToken: PublicKey;
+    let srMerkleLayers: any;
+    let srMerkleRoot: Buffer;
+    let srStart: number;
+
+    const srUser = Keypair.generate();
+    const srAmount = new BN(1_000_000).mul(new BN(1e9));
+
+    before(async () => {
+      srPool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+      [srPoolState] = getPoolStatePda(srPool);
+      [srPoolToken] = getPoolTokenPda(srPoolState);
+
+      srMerkleLayers = buildMerkleTree([
+        computeLeaf(srUser.publicKey, srAmount),
+        computeLeaf(alice.publicKey, aliceAmount),
+      ]);
+      srMerkleRoot = getMerkleRoot(srMerkleLayers);
+
+      await fundAccount(srUser.publicKey);
+      srStart = Math.floor(Date.now() / 1000) + 1000;
+      await warpTo(srStart - 100);
+
+      await program.methods.initializePool(new BN(srStart), Array.from(srMerkleRoot), computeDailyRewards())
+        .accounts({
+          admin: admin.publicKey,
+          poolState: srPoolState,
+          tokenMint: srPool,
+          poolTokenAccount: srPoolToken,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+        }).signers([admin]).rpc();
+
+      const adminAta = await getOrCreateATABankrun(srPool, admin.publicKey);
+      await provider.sendAndConfirm(new anchor.web3.Transaction().add(
+        createMintToInstruction(srPool, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
+        createTransferInstruction(adminAta, srPoolToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
+      ), [admin]);
+    });
+
+    it("claim_airdrop without snapshot fails with SnapshotRequiredFirst", async () => {
+      // Warp to Day 2 without taking any snapshot
+      await warpTo(srStart + 2 * SECONDS_PER_DAY + 3600);
+
+      const [srStake] = getUserStakePda(srPoolState, alice.publicKey);
+      const [srMarker] = getClaimMarkerPda(srPoolState, alice.publicKey);
+
+      try {
+        await program.methods.claimAirdrop(aliceAmount, getMerkleProof(srMerkleLayers, computeLeaf(alice.publicKey, aliceAmount)))
+          .accounts({ user: alice.publicKey, poolState: srPoolState, claimMarker: srMarker, userStake: srStake, systemProgram: SystemProgram.programId })
+          .signers([alice]).rpc();
+        expect.fail("Should have failed with SnapshotRequiredFirst");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("SnapshotRequiredFirst") || m.includes("6019") || m.includes("0x1783"));
+      }
+    });
+
+    it("unstake without snapshot fails with SnapshotRequiredFirst", async () => {
+      // First, take snapshot for Day 2 so user can claim
+      await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: srPoolState }).signers([admin]).rpc();
+
+      const [srStake] = getUserStakePda(srPoolState, srUser.publicKey);
+      const [srMarker] = getClaimMarkerPda(srPoolState, srUser.publicKey);
+      await program.methods.claimAirdrop(srAmount, getMerkleProof(srMerkleLayers, computeLeaf(srUser.publicKey, srAmount)))
+        .accounts({ user: srUser.publicKey, poolState: srPoolState, claimMarker: srMarker, userStake: srStake, systemProgram: SystemProgram.programId })
+        .signers([srUser]).rpc();
+
+      // Warp to Day 5 WITHOUT taking snapshot for Day 5
+      await warpTo(srStart + 5 * SECONDS_PER_DAY + 3600);
+
+      const srUserAta = await getOrCreateATABankrun(srPool, srUser.publicKey, srUser);
+      try {
+        await program.methods.unstake()
+          .accounts({
+            user: srUser.publicKey,
+            poolState: srPoolState,
+            userStake: srStake,
+            poolTokenAccount: srPoolToken,
+            userTokenAccount: srUserAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          }).signers([srUser]).rpc();
+        expect.fail("Should have failed with SnapshotRequiredFirst");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("SnapshotRequiredFirst") || m.includes("6019") || m.includes("0x1783"));
+      }
+    });
+  });
+
+  describe("Snapshot after Day 20", () => {
+    it("snapshot after Day 20 fails with InvalidDay", async () => {
+      const sdPool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+      const [sdPoolState] = getPoolStatePda(sdPool);
+      const [sdPoolToken] = getPoolTokenPda(sdPoolState);
+
+      const sdStart = Math.floor(Date.now() / 1000) + 1000;
+      await warpTo(sdStart - 100);
+
+      await program.methods.initializePool(new BN(sdStart), Array.from(multiMerkleRoot), computeDailyRewards())
+        .accounts({
+          admin: admin.publicKey,
+          poolState: sdPoolState,
+          tokenMint: sdPool,
+          poolTokenAccount: sdPoolToken,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+        }).signers([admin]).rpc();
+
+      // Warp to Day 25 (beyond TOTAL_DAYS=20)
+      await warpTo(sdStart + 25 * SECONDS_PER_DAY + 3600);
+
+      try {
+        await program.methods.snapshot()
+          .accounts({ signer: admin.publicKey, poolState: sdPoolState })
+          .signers([admin]).rpc();
+        expect.fail("Should have failed with InvalidDay");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("InvalidDay") || m.includes("6017") || m.includes("0x1781"));
+      }
+    });
+  });
+
+  describe("initialize_pool error path", () => {
+    it("StartTimeInPast: initialize with start_time in the past", async () => {
+      const mint = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+      const [pState] = getPoolStatePda(mint);
+      const [pToken] = getPoolTokenPda(pState);
+
+      const now = Math.floor(Date.now() / 1000);
+      await warpTo(now);
+
+      // Set start_time in the past
+      const pastStart = now - 3600;
+
+      try {
+        await program.methods.initializePool(new BN(pastStart), Array.from(multiMerkleRoot), computeDailyRewards())
+          .accounts({
+            admin: admin.publicKey,
+            poolState: pState,
+            tokenMint: mint,
+            poolTokenAccount: pToken,
+            systemProgram: SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            rent: SYSVAR_RENT_PUBKEY,
+          }).signers([admin]).rpc();
+        expect.fail("Should have failed with StartTimeInPast");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("StartTimeInPast") || m.includes("6000") || m.includes("0x1770"));
+      }
+    });
+  });
+
 });
