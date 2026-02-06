@@ -96,10 +96,10 @@ pub mod memeland_airdrop {
         let current_day = get_current_day(pool.start_time, clock.unix_timestamp);
 
         // Block claims if previous day's snapshot hasn't been taken yet
-        // On day N (N >= 2), require snapshot for day N-1
-        if current_day >= 2 {
+        // On day N (N >= 1), require snapshot for this day 
+        if current_day >= 1 {
             require!(
-                pool.snapshot_count >= (current_day - 1) as u8,
+                pool.snapshot_count >= current_day as u8,
                 ErrorCode::SnapshotRequiredFirst
             );
         }
@@ -249,9 +249,9 @@ pub mod memeland_airdrop {
 
         // Block unstaking if previous day's snapshot hasn't been taken yet
         let current_day = get_current_day(pool.start_time, clock.unix_timestamp);
-        if current_day >= 2 {
+        if current_day >= 1 {
             require!(
-                pool.snapshot_count >= (current_day - 1) as u8,
+                pool.snapshot_count >= current_day as u8,
                 ErrorCode::SnapshotRequiredFirst
             );
         }
