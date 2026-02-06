@@ -168,76 +168,34 @@ pub mod memeland_airdrop {
             ErrorCode::InvalidDay
         );
 
-        // Cannot snapshot if already taken for this day
-        let snap_idx = (current_day - 1) as usize;
-        require!(
-            pool.daily_snapshots[snap_idx] == 0,
-            ErrorCode::SnapshotAlreadyExists
-        );
+        let last = pool.snapshot_count as usize;
 
-        // Record snapshot
-        pool.daily_snapshots[snap_idx] = pool.total_staked;
+        let mut wrote = false;
+
+        // fill ONLY missing days
+        for d in last..(current_day as usize) {
+            if pool.daily_snapshots[d] == 0 {
+                pool.daily_snapshots[d] = pool.total_staked;
+                wrote = true;
+            }
+        }
 
         // snapshot_count tracks the highest day snapshotted (upper bound for reward loop)
         pool.snapshot_count = current_day as u8;
 
-        emit!(SnapshotTaken {
-            day: current_day,
-            total_staked: pool.total_staked,
-        });
-
-        msg!(
-            "Snapshot {} recorded: total_staked = {}",
-            current_day,
-            pool.total_staked
-        );
-        Ok(())
-    }
-
-    /// Admin-only backfill for missed snapshots.
-    /// Only for emergencies when regular snapshot() failed.
-    /// Cannot overwrite existing snapshots.
-    pub fn backfill_snapshot(ctx: Context<BackfillSnapshot>, day: u64) -> Result<()> {
-        let pool = &mut ctx.accounts.pool_state.load_mut()?;
-        let clock = Clock::get()?;
-
-        // Must not be paused or terminated
-        require!(pool.paused == 0, ErrorCode::PoolPaused);
-        require!(pool.terminated == 0, ErrorCode::PoolTerminated);
-
-        // Day must be valid (1-20)
-        require!(day >= 1 && day <= TOTAL_DAYS, ErrorCode::InvalidDay);
-
-        // Can only backfill days that have passed
-        let current_day = get_current_day(pool.start_time, clock.unix_timestamp);
-        require!(day <= current_day, ErrorCode::SnapshotTooEarly);
-
-        // Cannot overwrite existing snapshot
-        let snap_idx = (day - 1) as usize;
-        require!(
-            pool.daily_snapshots[snap_idx] == 0,
-            ErrorCode::SnapshotAlreadyExists
-        );
-
-        // Record snapshot using current total_staked
-        pool.daily_snapshots[snap_idx] = pool.total_staked;
-
-        // Update snapshot_count to track highest day snapshotted
-        // This is used as upper bound in reward calculation loop
-        if day as u8 > pool.snapshot_count {
-            pool.snapshot_count = day as u8;
+        if wrote {  
+            emit!(SnapshotTaken {
+                    day: current_day,
+                    total_staked: pool.total_staked,
+                }); 
+            msg!(
+                "Snapshot {} recorded: total_staked = {}",
+                current_day,
+                pool.total_staked
+            );
+        } else {
+            msg!("No snapshots needed for today.");
         }
-
-        emit!(SnapshotTaken {
-            day,
-            total_staked: pool.total_staked,
-        });
-
-        msg!(
-            "Backfilled snapshot for day {}: total_staked = {}",
-            day,
-            pool.total_staked
-        );
         Ok(())
     }
 
@@ -676,18 +634,6 @@ pub struct ClaimAirdrop<'info> {
 #[derive(Accounts)]
 pub struct Snapshot<'info> {
     pub signer: Signer<'info>,
-
-    #[account(mut)]
-    pub pool_state: AccountLoader<'info, PoolState>,
-}
-
-#[derive(Accounts)]
-pub struct BackfillSnapshot<'info> {
-    /// Must be the pool admin to backfill snapshots
-    #[account(
-        constraint = admin.key() == pool_state.load()?.admin @ ErrorCode::UnauthorizedAdmin,
-    )]
-    pub admin: Signer<'info>,
 
     #[account(mut)]
     pub pool_state: AccountLoader<'info, PoolState>,
