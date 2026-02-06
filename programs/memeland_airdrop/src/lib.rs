@@ -43,6 +43,14 @@ pub mod memeland_airdrop {
         merkle_root: [u8; 32],
         daily_rewards: [u64; 20],
     ) -> Result<()> {
+
+        let clock = Clock::get()?;
+
+        require!(
+            start_time > clock.unix_timestamp,
+            ErrorCode::StartTimeInPast
+        );
+        
         let pool = &mut ctx.accounts.pool_state.load_init()?;
         pool.admin = ctx.accounts.admin.key();
         pool.token_mint = ctx.accounts.token_mint.key();
@@ -892,6 +900,8 @@ pub struct PoolUnpausedEvent {
 #[error_code]
 pub enum ErrorCode {
     // ── Pool Errors ────────────────────────────────────────────────────────────
+    #[msg("Start time is in the past - cannot initialize pool")]
+    StartTimeInPast,
     #[msg("Airdrop pool exhausted - no more tokens available for claims")]
     AirdropPoolExhausted,
     #[msg("Pool has been terminated - no new claims allowed")]
