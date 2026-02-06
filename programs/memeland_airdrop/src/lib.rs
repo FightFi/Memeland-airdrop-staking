@@ -43,14 +43,9 @@ pub mod memeland_airdrop {
         merkle_root: [u8; 32],
         daily_rewards: [u64; 20],
     ) -> Result<()> {
-
         let clock = Clock::get()?;
-
-        require!(
-            start_time > clock.unix_timestamp,
-            ErrorCode::StartTimeInPast
-        );
-
+        require!(start_time > clock.unix_timestamp, ErrorCode::StartTimeInPast);
+    
         let pool = &mut ctx.accounts.pool_state;
         pool.admin = ctx.accounts.admin.key();
         pool.token_mint = ctx.accounts.token_mint.key();
@@ -64,28 +59,35 @@ pub mod memeland_airdrop {
         pool.paused = 0;
         pool.bump = ctx.bumps.pool_state;
         pool.pool_token_bump = ctx.bumps.pool_token_account;
-
+    
         // Validate that the supplied daily rewards sum to exactly STAKING_POOL
+        // AND ensure ascending order
         let mut sum: u64 = 0;
         for d in 0..20usize {
+            if d >= 1 {
+                require!(
+                    daily_rewards[d] >= daily_rewards[d - 1],
+                    ErrorCode::InvalidDailyRewardsOrder
+                );
+            }
             sum = sum.checked_add(daily_rewards[d]).unwrap();
             pool.daily_rewards[d] = daily_rewards[d];
         }
         require!(sum == STAKING_POOL, ErrorCode::InvalidDailyRewards);
-
+    
         emit!(PoolInitialized {
             admin: pool.admin,
             token_mint: pool.token_mint,
             start_time: pool.start_time,
         });
-
+    
         msg!(
             "Pool initialized. Start: {}, merkle root set, {} daily rewards validated",
             pool.start_time,
             TOTAL_DAYS
         );
         Ok(())
-    }
+    }    
 
     /// Claim airdrop via merkle proof. Tokens are auto-staked.
     /// Creates a permanent ClaimMarker (prevents re-claims) and a UserStake (closed on unstake).
