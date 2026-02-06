@@ -281,6 +281,12 @@ pub mod memeland_airdrop {
         let pool = &mut ctx.accounts.pool_state.load_mut()?;
 
         require!(pool.terminated == 0, ErrorCode::AlreadyTerminated);
+
+        require!(
+            pool.snapshot_count as u64 >= TOTAL_DAYS,
+            ErrorCode::SnapshotsNotCompleted
+        );
+    
         pool.terminated = 1;
 
         // Calculate safe drain amount
@@ -930,6 +936,8 @@ pub enum ErrorCode {
     SnapshotRequiredFirst,
     #[msg("Snapshot already exists for this day - cannot overwrite")]
     SnapshotAlreadyExists,
+    #[msg("Snapshots not completed - must take all 20 snapshots")]
+    SnapshotsNotCompleted,
 
     // ── Token Account Errors ───────────────────────────────────────────────────
     #[msg("Invalid pool token account - does not match pool state")]
