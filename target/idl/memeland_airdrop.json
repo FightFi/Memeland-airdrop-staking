@@ -871,51 +871,31 @@
     },
     {
       "code": 6018,
-      "name": "SnapshotTooEarly",
-      "msg": "Snapshot too early - day has not yet elapsed"
-    },
-    {
-      "code": 6019,
       "name": "SnapshotRequiredFirst",
       "msg": "Previous day's snapshot must be taken before claims/unstakes"
     },
     {
-      "code": 6020,
-      "name": "SnapshotAlreadyExists",
-      "msg": "Snapshot already exists for this day - cannot overwrite"
-    },
-    {
-      "code": 6021,
+      "code": 6019,
       "name": "SnapshotsNotCompleted",
       "msg": "Snapshots not completed - must take all 20 snapshots"
     },
     {
-      "code": 6022,
+      "code": 6020,
       "name": "InvalidPoolTokenAccount",
       "msg": "Invalid pool token account - does not match pool state"
     },
     {
-      "code": 6023,
-      "name": "InvalidUserTokenMint",
-      "msg": "Invalid user token account - mint does not match pool"
-    },
-    {
-      "code": 6024,
-      "name": "InvalidAdminTokenMint",
-      "msg": "Invalid admin token account - mint does not match pool"
-    },
-    {
-      "code": 6025,
+      "code": 6021,
       "name": "ExitWindowNotFinished",
       "msg": "Exit window not finished - must wait until day 35"
     },
     {
-      "code": 6026,
+      "code": 6022,
       "name": "NothingToRecover",
       "msg": "No tokens to recover - pool balance equals staked amount"
     },
     {
-      "code": 6027,
+      "code": 6023,
       "name": "PoolNotStartedYet",
       "msg": "Pool not started yet - must wait until start time"
     }

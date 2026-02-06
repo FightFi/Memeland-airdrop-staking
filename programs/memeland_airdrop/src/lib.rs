@@ -953,22 +953,14 @@ pub enum ErrorCode {
     // ── Snapshot Errors ────────────────────────────────────────────────────────
     #[msg("Invalid day - must be between 1 and 20")]
     InvalidDay,
-    #[msg("Snapshot too early - day has not yet elapsed")]
-    SnapshotTooEarly,
     #[msg("Previous day's snapshot must be taken before claims/unstakes")]
     SnapshotRequiredFirst,
-    #[msg("Snapshot already exists for this day - cannot overwrite")]
-    SnapshotAlreadyExists,
     #[msg("Snapshots not completed - must take all 20 snapshots")]
     SnapshotsNotCompleted,
 
     // ── Token Account Errors ───────────────────────────────────────────────────
     #[msg("Invalid pool token account - does not match pool state")]
     InvalidPoolTokenAccount,
-    #[msg("Invalid user token account - mint does not match pool")]
-    InvalidUserTokenMint,
-    #[msg("Invalid admin token account - mint does not match pool")]
-    InvalidAdminTokenMint,
 
     // ── Recovery Errors ────────────────────────────────────────────────────────
     #[msg("Exit window not finished - must wait until day 35")]
