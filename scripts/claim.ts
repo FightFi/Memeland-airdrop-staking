@@ -296,7 +296,7 @@ async function main() {
     } else if (errMsg.includes("InvalidMerkleProof")) {
       console.error("\n❌ Failed: Invalid merkle proof.");
     } else if (errMsg.includes("AirdropPoolExhausted")) {
-      console.error("\n❌ Failed: Airdrop pool exhausted (50M limit reached).");
+      console.error("\n❌ Failed: Airdrop pool exhausted (67M limit reached).");
     } else if (errMsg.includes("SnapshotRequiredFirst")) {
       console.error("\n❌ Failed: Previous day's snapshot required. Contact admin.");
     } else if (errMsg.includes("already in use")) {

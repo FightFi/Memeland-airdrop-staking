@@ -1,15 +1,15 @@
 import BN from "bn.js";
 
 // Must match the on-chain constant
-export const STAKING_POOL = new BN("100000000000000000"); // 100M with 9 decimals
+export const STAKING_POOL = new BN("133000000000000000"); // 133M with 9 decimals
 
 /**
  * Computes the 20-day exponential reward curve off-chain.
- * Uses K=0.05 growth factor, matching the on-chain validation.
+ * Uses K=0.15 growth factor, matching the on-chain validation.
  * The sum of all rewards equals exactly STAKING_POOL.
  */
 export function computeDailyRewards(): BN[] {
-  const K = 0.05;
+  const K = 0.15;
   const SCALE = 1e15; // Scale factor for precision in BigInt math
 
   const expValues = Array.from({ length: 20 }, (_, d) => Math.exp(K * d));

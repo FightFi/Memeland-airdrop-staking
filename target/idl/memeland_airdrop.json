@@ -812,7 +812,7 @@
     {
       "code": 6006,
       "name": "InvalidDailyRewards",
-      "msg": "Daily rewards must sum to exactly STAKING_POOL (100M tokens)"
+      "msg": "Daily rewards must sum to exactly STAKING_POOL (133M tokens)"
     },
     {
       "code": 6007,

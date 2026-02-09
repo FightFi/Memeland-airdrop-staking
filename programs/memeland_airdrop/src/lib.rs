@@ -10,11 +10,11 @@ pub const TOTAL_DAYS: u64 = 20;
 pub const SECONDS_PER_DAY: u64 = 86400;
 pub const EXIT_WINDOW_DAYS: u64 = 15;
 
-/// Airdrop pool: 50_000_000 tokens × 10^9 (9 decimals)
-pub const AIRDROP_POOL: u64 = 50_000_000_000_000_000;
+/// Airdrop pool: 67_000_000 tokens × 10^9 (9 decimals)
+pub const AIRDROP_POOL: u64 = 67_000_000_000_000_000;
 
-/// Staking rewards pool: 100_000_000 tokens × 10^9
-pub const STAKING_POOL: u64 = 100_000_000_000_000_000;
+/// Staking rewards pool: 133_000_000 tokens × 10^9
+pub const STAKING_POOL: u64 = 133_000_000_000_000_000;
 
 /// TODO: Replace with actual admin pubkey before deployment
 pub const INIT_AUTHORITY: Pubkey = pubkey!("CpPPfLTUzytRXBrUUjb84EkYtA84CsoeVefhaJ2cyPg3");
@@ -921,7 +921,7 @@ pub enum ErrorCode {
     PoolNotTerminated,
     #[msg("Pool still has staked funds - all users must unstake first")]
     PoolNotEmpty,
-    #[msg("Daily rewards must sum to exactly STAKING_POOL (100M tokens)")]
+    #[msg("Daily rewards must sum to exactly STAKING_POOL (133M tokens)")]
     InvalidDailyRewards,
     #[msg("Daily rewards must be in ascending order")]
     InvalidDailyRewardsOrder,

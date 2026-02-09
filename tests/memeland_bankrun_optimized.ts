@@ -27,8 +27,8 @@ const { keccak256 } = pkg;
 // Constants from lib.rs
 const TOTAL_DAYS = 20;
 const SECONDS_PER_DAY = 86400;
-const STAKING_POOL = new BN("100000000000000000"); // 100M tokens
-const AIRDROP_POOL = new BN("50000000000000000");  // 50M tokens
+const STAKING_POOL = new BN("133000000000000000"); // 133M tokens
+const AIRDROP_POOL = new BN("67000000000000000");  // 67M tokens
 const TOKEN_DECIMALS = 9;
 const TOTAL_POOL = STAKING_POOL.add(AIRDROP_POOL);
 
@@ -914,8 +914,8 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
 
         const balAfterUnstake = (await getAccountBankrun(tUserAta))!.amount;
         console.log("Termination Test - Balance After Unstake (Total Expected):", balAfterUnstake.toString());
-        // User gets 10M principal + 75M airdrop = 85M total
-        const expectedTotal = BigInt(tAmount.toString()) + BigInt("75000000000000000"); 
+        // User gets 10M principal + 99.75M rewards = 109.75M total
+        const expectedTotal = BigInt(tAmount.toString()) + BigInt("99750000000000000");
         expect(balAfterUnstake).to.equal(expectedTotal);
     });
   });
@@ -1036,7 +1036,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
         });
 
         it("Fails when Airdrop Pool is exhausted", async () => {
-            // User 1 & 2 together take 100% (50M)
+            // User 1 & 2 together take 100% (67M)
             for (let i = 0; i < 2; i++) {
                 const user = users[i];
                 await fundAccount(user.publicKey);
@@ -1047,7 +1047,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
                     .signers([user]).rpc();
             }
 
-            // User 3 tries to claim, exceeding 50M
+            // User 3 tries to claim, exceeding 67M
             const user3 = users[2];
             await fundAccount(user3.publicKey);
             const [stake3] = getUserStakePda(xPoolState, user3.publicKey);
@@ -1139,12 +1139,10 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
                 .signers([fUser]).rpc();
 
              const bal = (await getAccountBankrun(fUserAta))!.amount;
-             // Expected: 10M principal + (10/20)*100M rewards = 10M + 50M = 60M
-             // Plus the 10M from the airdrop itself (which was also 10M) = 70M total
-             // Math: 10M (staked) + 50M (rewards) = 60M + 0 (starting bal) = 60M. 
-             // Wait, claimAirdrop doesn't send tokens to ATA, it stakes them. 
+             // Expected: 10M principal + (10/20)*133M rewards = 10M + 66.5M = 76.5M
+             // claimAirdrop doesn't send tokens to ATA, it stakes them.
              // Unstake sends (principal + rewards).
-             expect(bal.toString()).to.equal("60000000000000000");
+             expect(bal.toString()).to.equal("76500000000000000");
         });
 
         it("Unstake after expiration (Day 36) returns only principal", async () => {

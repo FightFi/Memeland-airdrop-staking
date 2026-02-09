@@ -20,8 +20,8 @@ import { getAccount } from "@solana/spl-token";
 const SECONDS_PER_DAY = 86400;
 const TOTAL_DAYS = 20;
 const EXIT_WINDOW_DAYS = 15;
-const AIRDROP_POOL = BigInt("50000000000000000"); // 50M with 9 decimals
-const STAKING_POOL = BigInt("100000000000000000"); // 100M with 9 decimals
+const AIRDROP_POOL = BigInt("67000000000000000"); // 67M with 9 decimals
+const STAKING_POOL = BigInt("133000000000000000"); // 133M with 9 decimals
 const TOTAL_POOL = AIRDROP_POOL + STAKING_POOL;
 const DECIMALS = 9;
 
