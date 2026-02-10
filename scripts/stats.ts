@@ -329,36 +329,48 @@ async function main() {
   // This is approximate since ClaimMarkers persist
   const estimatedUnstaked = Math.max(0, claimMarkerAccounts.length - activeStakers);
 
+  // Calculate total unstaked principal: everything claimed minus what's still staked
+  const totalUnstakedPrincipal = pool.totalAirdropClaimed > pool.totalStaked
+    ? pool.totalAirdropClaimed - pool.totalStaked
+    : 0n;
+
+  // Calculate rewards paid out to unstakers from actual staking data:
+  // 1. Sum total rewards distributed across all snapshotted days
+  // 2. Subtract pending rewards for active stakers (their share still in the pool)
+  // This avoids relying on a hardcoded initial funding amount.
+  let totalRewardsDistributed = 0n;
+  for (let d = 0; d < pool.snapshotCount && d < TOTAL_DAYS; d++) {
+    totalRewardsDistributed += pool.dailyRewards[d];
+  }
+
+  let pendingRewardsForActiveStakers = 0n;
+  for (const stake of stakes) {
+    for (let d = stake.claimDay; d < pool.snapshotCount && d < TOTAL_DAYS; d++) {
+      const snapshotTotal = pool.dailySnapshots[d];
+      if (snapshotTotal === 0n) continue;
+      const daily = pool.dailyRewards[d];
+      // Use 128-bit math to avoid overflow
+      const userShare = (BigInt(stake.stakedAmount) * BigInt(daily)) / BigInt(snapshotTotal);
+      pendingRewardsForActiveStakers += userShare;
+    }
+  }
+
+  const totalRewardsPaid = totalRewardsDistributed > pendingRewardsForActiveStakers
+    ? totalRewardsDistributed - pendingRewardsForActiveStakers
+    : 0n;
+
+  const totalUnstakedAmount = totalUnstakedPrincipal + totalRewardsPaid;
+
   // Calculate claim statistics
   const airdropRemaining = AIRDROP_POOL - pool.totalAirdropClaimed;
   const claimPercentage = formatPercent(pool.totalAirdropClaimed, AIRDROP_POOL);
 
-  // Analyze stake distribution
-  const stakeDistribution = {
-    under1k: 0,
-    from1kTo10k: 0,
-    from10kTo100k: 0,
-    from100kTo1m: 0,
-    over1m: 0,
-  };
-
   let largestStake = 0n;
   let smallestStake = stakes.length > 0 ? stakes[0].stakedAmount : 0n;
-  const claimDayDistribution: Record<number, number> = {};
 
   for (const stake of stakes) {
-    const amount = Number(stake.stakedAmount) / 1e9;
-
-    if (amount < 1000) stakeDistribution.under1k++;
-    else if (amount < 10000) stakeDistribution.from1kTo10k++;
-    else if (amount < 100000) stakeDistribution.from10kTo100k++;
-    else if (amount < 1000000) stakeDistribution.from100kTo1m++;
-    else stakeDistribution.over1m++;
-
     if (stake.stakedAmount > largestStake) largestStake = stake.stakedAmount;
     if (stake.stakedAmount < smallestStake) smallestStake = stake.stakedAmount;
-
-    claimDayDistribution[stake.claimDay] = (claimDayDistribution[stake.claimDay] || 0) + 1;
   }
 
   // Build stats object
@@ -398,15 +410,26 @@ async function main() {
       estimatedUnstaked,
       totalStaked: formatTokens(pool.totalStaked),
       totalStakedRaw: pool.totalStaked.toString(),
+      totalUnstakedPrincipal: formatTokens(totalUnstakedPrincipal),
+      totalUnstakedPrincipalRaw: totalUnstakedPrincipal.toString(),
+      totalRewardsPaid: formatTokens(totalRewardsPaid),
+      totalRewardsPaidRaw: totalRewardsPaid.toString(),
+      totalUnstakedAmount: formatTokens(totalUnstakedAmount),
+      totalUnstakedAmountRaw: totalUnstakedAmount.toString(),
       averageStake: activeStakers > 0 ? formatTokens(pool.totalStaked / BigInt(activeStakers)) : "0",
       largestStake: formatTokens(largestStake),
       smallestStake: formatTokens(smallestStake),
       stakingPoolSize: formatTokens(STAKING_POOL),
     },
-    distribution: {
-      bySize: stakeDistribution,
-      byClaimDay: claimDayDistribution,
-    },
+    stakers: stakes
+      .sort((a, b) => (b.stakedAmount > a.stakedAmount ? 1 : -1))
+      .map((s) => ({
+        owner: s.owner.toBase58(),
+        amount: formatTokens(s.stakedAmount),
+        amountRaw: s.stakedAmount.toString(),
+        share: formatPercent(s.stakedAmount, pool.totalStaked),
+        claimDay: s.claimDay,
+      })),
     snapshots: {
       count: pool.snapshotCount,
       required: Math.min(currentDay, TOTAL_DAYS),
@@ -429,7 +452,9 @@ async function main() {
     treasury: {
       poolTokenBalance: formatTokens(poolTokenBalance),
       poolTokenBalanceRaw: poolTokenBalance.toString(),
-      totalPoolSize: formatTokens(TOTAL_POOL),
+      stakedPrincipal: formatTokens(pool.totalStaked),
+      unclaimedAirdrop: merkleData ? formatTokens(eligibleAmount - pool.totalAirdropClaimed) : "N/A (no merkle data)",
+      stakingRewardsMax: formatTokens(STAKING_POOL),
     },
   };
 
@@ -504,7 +529,10 @@ async function main() {
   // Staking
   log("\n┌─ STAKING ───────────────────────────────────────────────────────┐");
   log(`│  Active Stakers:   ${pool.activeStakers.toLocaleString()} (on-chain)`);
-  log(`│  Unstaked:         ${pool.totalUnstaked.toLocaleString()} (on-chain)`);
+  log(`│  Unstaked:         ${pool.totalUnstaked.toLocaleString()} users (on-chain)`);
+  log(`│  Unstaked Amount:  ${formatTokens(totalUnstakedAmount)} tokens`);
+  log(`│    Principal:      ${formatTokens(totalUnstakedPrincipal)} tokens`);
+  log(`│    Rewards:        ${formatTokens(totalRewardsPaid)} tokens`);
   log(`│  Total Staked:     ${formatTokens(pool.totalStaked)} tokens`);
   if (pool.activeStakers > 0) {
     log(`│  Average Stake:    ${formatTokens(pool.totalStaked / BigInt(pool.activeStakers))} tokens`);
@@ -513,14 +541,16 @@ async function main() {
   }
   log("└─────────────────────────────────────────────────────────────────┘");
 
-  // Stake Distribution
-  if (activeStakers > 0) {
-    log("\n┌─ STAKE DISTRIBUTION ────────────────────────────────────────────┐");
-    log(`│  < 1K tokens:       ${stakeDistribution.under1k.toLocaleString().padStart(6)} stakers`);
-    log(`│  1K - 10K tokens:   ${stakeDistribution.from1kTo10k.toLocaleString().padStart(6)} stakers`);
-    log(`│  10K - 100K tokens: ${stakeDistribution.from10kTo100k.toLocaleString().padStart(6)} stakers`);
-    log(`│  100K - 1M tokens:  ${stakeDistribution.from100kTo1m.toLocaleString().padStart(6)} stakers`);
-    log(`│  > 1M tokens:       ${stakeDistribution.over1m.toLocaleString().padStart(6)} stakers`);
+  // Individual Stakes
+  if (stakes.length > 0) {
+    const sorted = [...stakes].sort((a, b) => (b.stakedAmount > a.stakedAmount ? 1 : -1));
+    log("\n┌─ STAKERS ───────────────────────────────────────────────────────┐");
+    for (let i = 0; i < sorted.length; i++) {
+      const s = sorted[i];
+      const pct = formatPercent(s.stakedAmount, pool.totalStaked);
+      log(`│  ${(i + 1).toString().padStart(2)}. ${s.owner.toBase58()}`);
+      log(`│      ${formatTokens(s.stakedAmount).padStart(20)} tokens (${pct}) — claimed day ${s.claimDay}`);
+    }
     log("└─────────────────────────────────────────────────────────────────┘");
   }
 
@@ -566,26 +596,14 @@ async function main() {
 
   // Treasury
   log("\n┌─ TREASURY ──────────────────────────────────────────────────────┐");
-  log(`│  Pool Token Balance: ${formatTokens(poolTokenBalance)} tokens`);
-  log(`│  Total Pool Size:    ${formatTokens(TOTAL_POOL)} tokens`);
-  const distributed = TOTAL_POOL - poolTokenBalance;
-  log(`│  Distributed:        ${formatTokens(distributed)} tokens`);
-  log("└─────────────────────────────────────────────────────────────────┘");
-
-  // Claims by Day (if there's data)
-  if (Object.keys(claimDayDistribution).length > 0) {
-    log("\n┌─ CLAIMS BY DAY ─────────────────────────────────────────────────┐");
-    const sortedDays = Object.keys(claimDayDistribution).map(Number).sort((a, b) => a - b);
-    for (const day of sortedDays.slice(0, 10)) {
-      const count = claimDayDistribution[day];
-      const bar = "█".repeat(Math.min(30, Math.ceil(count / Math.max(...Object.values(claimDayDistribution)) * 30)));
-      log(`│  Day ${day.toString().padStart(2)}: ${count.toString().padStart(5)} ${bar}`);
-    }
-    if (sortedDays.length > 10) {
-      log(`│  ... and ${sortedDays.length - 10} more days`);
-    }
-    log("└─────────────────────────────────────────────────────────────────┘");
+  log(`│  Pool Token Balance:     ${formatTokens(poolTokenBalance)} tokens`);
+  log(`│  ├─ Staked (principal):  ${formatTokens(pool.totalStaked)} tokens`);
+  if (merkleData) {
+    const unclaimedAirdrop = eligibleAmount - pool.totalAirdropClaimed;
+    log(`│  ├─ Unclaimed airdrop:  ${formatTokens(unclaimedAirdrop)} tokens`);
   }
+  log(`│  └─ Staking rewards:    ${formatTokens(STAKING_POOL)} tokens (max)`);
+  log("└─────────────────────────────────────────────────────────────────┘");
 
   log("\n" + "═".repeat(70));
   log(`   Generated: ${new Date().toUTCString()}`);
