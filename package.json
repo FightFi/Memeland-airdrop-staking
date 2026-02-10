@@ -31,7 +31,9 @@
     "rewards:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/calculate-rewards.ts",
     "rewards:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/calculate-rewards.ts",
     "unstake-preview:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/unstake-preview.ts",
-    "unstake-preview:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/unstake-preview.ts"
+    "unstake-preview:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/unstake-preview.ts",
+    "deploy:devnet": "bash scripts/deploy_anchor.sh",
+    "deploy:prod": "CLUSTER=mainnet-beta bash scripts/deploy_anchor.sh"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.31.0",
