@@ -137,7 +137,7 @@ Admin can pause the pool at any time to block:
 
 ### Accounts
 
-**PoolState** (zero-copy, PDA: `["pool_state", mint]`)
+**PoolState** (PDA: `["pool_state", mint]`)
 - Admin, mint, token account references, merkle root
 - `daily_rewards[32]` — pre-computed reward curve (indices 0-19 used)
 - `daily_snapshots[32]` — recorded total_staked per day
@@ -382,27 +382,30 @@ await program.methods
 
 | Code | Name | Description |
 |------|------|-------------|
-| 6000 | AirdropPoolExhausted | Airdrop pool (67M) fully claimed |
-| 6001 | NothingStaked | No staked balance to unstake |
-| 6002 | Unauthorized | Admin key mismatch |
-| 6003 | InvalidMerkleProof | Proof doesn't verify |
-| 6004 | PoolTerminated | Pool has been terminated |
-| 6005 | AlreadyTerminated | Pool already terminated |
-| 6006 | InvalidDay | Day out of range |
-| 6007 | SnapshotTooEarly | Day not yet elapsed |
-| 6008 | SnapshotRequiredFirst | Previous day's snapshot missing |
-| 6009 | InvalidDailyRewards | Rewards don't sum to STAKING_POOL |
-| 6010 | PoolNotTerminated | Must terminate before closing |
-| 6011 | PoolNotEmpty | Users must unstake before closing |
-| 6012 | ExitWindowNotFinished | Must wait until day 35 |
-| 6013 | NothingToRecover | No tokens to recover |
-| 6014 | SnapshotAlreadyExists | Snapshot already taken for this day |
-| 6015 | UnauthorizedAdmin | Signer is not the pool admin |
-| 6016 | InvalidStakeOwner | UserStake owner mismatch |
-| 6017 | InvalidPoolTokenAccount | Pool token account mismatch |
-| 6018 | PoolPaused | Pool is paused - operations disabled |
-| 6019 | PoolNotPaused | Pool is not paused |
-| 6020 | AlreadyPaused | Pool is already paused |
+| 6000 | StartTimeInPast | Start time is in the past |
+| 6001 | AirdropPoolExhausted | Airdrop pool (67M) fully claimed |
+| 6002 | PoolTerminated | Pool has been terminated |
+| 6003 | AlreadyTerminated | Pool already terminated |
+| 6004 | PoolNotTerminated | Must terminate before closing |
+| 6005 | PoolNotEmpty | Users must unstake before closing |
+| 6006 | InvalidDailyRewards | Rewards don't sum to STAKING_POOL |
+| 6007 | InvalidDailyRewardsOrder | Daily rewards must be ascending |
+| 6008 | PoolPaused | Pool is paused - operations disabled |
+| 6009 | PoolNotPaused | Pool is not paused |
+| 6010 | AlreadyPaused | Pool is already paused |
+| 6011 | ProgramExpired | Program has expired |
+| 6012 | NothingStaked | No staked balance to unstake |
+| 6013 | InvalidStakeOwner | UserStake owner mismatch |
+| 6014 | UnauthorizedAdmin | Signer is not the pool admin |
+| 6015 | Unauthorized | Generic access denied |
+| 6016 | InvalidMerkleProof | Proof doesn't verify |
+| 6017 | InvalidDay | Day out of range |
+| 6018 | SnapshotRequiredFirst | Previous day's snapshot missing |
+| 6019 | SnapshotsNotCompleted | Must take all 20 snapshots |
+| 6020 | InvalidPoolTokenAccount | Pool token account mismatch |
+| 6021 | ExitWindowNotFinished | Must wait until day 35 |
+| 6022 | NothingToRecover | No tokens to recover |
+| 6023 | PoolNotStartedYet | Pool not started yet |
 
 ## Constants
 

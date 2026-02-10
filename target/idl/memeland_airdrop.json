@@ -4,7 +4,7 @@
     "name": "memeland_airdrop",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Memeland Airdrop & 60-Day Exponential Staking Program"
+    "description": "Memeland Airdrop & 20-Day Exponential Staking Program"
   },
   "instructions": [
     {
