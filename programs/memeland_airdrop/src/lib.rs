@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak;
 use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("4y6rh1SKMAGvunes2gHCeJkEkmPVDLhWYxNg8Zpd7RqH");
+declare_id!("4uxX6uS3V9pyP3ei8NWZzz6RsqSddEhwosSqLD3ZbsVs");
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -10,14 +10,14 @@ pub const TOTAL_DAYS: u64 = 20;
 pub const SECONDS_PER_DAY: u64 = 86400;
 pub const EXIT_WINDOW_DAYS: u64 = 15;
 
-/// Airdrop pool: 50_000_000 tokens × 10^9 (9 decimals)
-pub const AIRDROP_POOL: u64 = 50_000_000_000_000_000;
+/// Airdrop pool: 67_000_000 tokens × 10^9 (9 decimals)
+pub const AIRDROP_POOL: u64 = 67_000_000_000_000_000;
 
-/// Staking rewards pool: 100_000_000 tokens × 10^9
-pub const STAKING_POOL: u64 = 100_000_000_000_000_000;
+/// Staking rewards pool: 133_000_000 tokens × 10^9
+pub const STAKING_POOL: u64 = 133_000_000_000_000_000;
 
 /// TODO: Replace with actual admin pubkey before deployment
-pub const INIT_AUTHORITY: Pubkey = pubkey!("11111111111111111111111111111111");
+pub const INIT_AUTHORITY: Pubkey = pubkey!("CpPPfLTUzytRXBrUUjb84EkYtA84CsoeVefhaJ2cyPg3");
 
 
 // ── Seeds ──────────────────────────────────────────────────────────────────────
@@ -43,14 +43,9 @@ pub mod memeland_airdrop {
         merkle_root: [u8; 32],
         daily_rewards: [u64; 20],
     ) -> Result<()> {
-
         let clock = Clock::get()?;
-
-        require!(
-            start_time > clock.unix_timestamp,
-            ErrorCode::StartTimeInPast
-        );
-
+        require!(start_time > clock.unix_timestamp, ErrorCode::StartTimeInPast);
+    
         let pool = &mut ctx.accounts.pool_state;
         pool.admin = ctx.accounts.admin.key();
         pool.token_mint = ctx.accounts.token_mint.key();
@@ -64,28 +59,35 @@ pub mod memeland_airdrop {
         pool.paused = 0;
         pool.bump = ctx.bumps.pool_state;
         pool.pool_token_bump = ctx.bumps.pool_token_account;
-
+    
         // Validate that the supplied daily rewards sum to exactly STAKING_POOL
+        // AND ensure ascending order
         let mut sum: u64 = 0;
         for d in 0..20usize {
+            if d >= 1 {
+                require!(
+                    daily_rewards[d] >= daily_rewards[d - 1],
+                    ErrorCode::InvalidDailyRewardsOrder
+                );
+            }
             sum = sum.checked_add(daily_rewards[d]).unwrap();
             pool.daily_rewards[d] = daily_rewards[d];
         }
         require!(sum == STAKING_POOL, ErrorCode::InvalidDailyRewards);
-
+    
         emit!(PoolInitialized {
             admin: pool.admin,
             token_mint: pool.token_mint,
             start_time: pool.start_time,
         });
-
+    
         msg!(
             "Pool initialized. Start: {}, merkle root set, {} daily rewards validated",
             pool.start_time,
             TOTAL_DAYS
         );
         Ok(())
-    }
+    }    
 
     /// Claim airdrop via merkle proof. Tokens are auto-staked.
     /// Creates a permanent ClaimMarker (prevents re-claims) and a UserStake (closed on unstake).
@@ -139,6 +141,7 @@ pub mod memeland_airdrop {
 
         pool.total_staked = pool.total_staked.checked_add(amount).unwrap();
         pool.total_airdrop_claimed = pool.total_airdrop_claimed.checked_add(amount).unwrap();
+        pool.active_stakers = pool.active_stakers.checked_add(1).unwrap();
 
         require!(
             pool.total_airdrop_claimed <= AIRDROP_POOL,
@@ -166,7 +169,7 @@ pub mod memeland_airdrop {
     pub fn snapshot(ctx: Context<Snapshot>) -> Result<()> {
         let pool = &mut ctx.accounts.pool_state;
         let clock = Clock::get()?;
-
+    
         require!(pool.paused == 0, ErrorCode::PoolPaused);
         require!(pool.terminated == 0, ErrorCode::PoolTerminated);
 
@@ -205,6 +208,20 @@ pub mod memeland_airdrop {
         } else {
             msg!("No snapshots needed for today.");
         }
+
+        // log each daily snapshot
+        for d in 0..(current_day as usize) {
+            msg!("Daily snapshot {}: total_staked = {}", d, pool.daily_snapshots[d]);
+        }
+        msg!("Start time: {}", pool.start_time);
+        msg!("Current time: {}", clock.unix_timestamp);
+        msg!("Current day: {}", get_current_day(pool.start_time, clock.unix_timestamp));
+        msg!("Total staked: {}", pool.total_staked);
+        msg!("Total airdrop claimed: {}", pool.total_airdrop_claimed);
+        msg!("Snapshot count: {}", pool.snapshot_count);
+        msg!("Daily snapshots: {:?}", pool.daily_snapshots);
+        msg!("Active stakers: {}", pool.active_stakers);
+        msg!("Total unstaked: {}", pool.total_unstaked);
         Ok(())
     }
 
@@ -268,6 +285,8 @@ pub mod memeland_airdrop {
 
         // Update pool state (UserStake account is closed by Anchor's close constraint)
         pool.total_staked = pool.total_staked.checked_sub(user_stake.staked_amount).unwrap();
+        pool.active_stakers = pool.active_stakers.checked_sub(1).unwrap();
+        pool.total_unstaked = pool.total_unstaked.checked_add(1).unwrap();
 
         emit!(Unstaked {
             user: user_stake.owner,
@@ -427,7 +446,14 @@ pub mod memeland_airdrop {
         let pool = &ctx.accounts.pool_state;
 
         require!(pool.terminated == 1, ErrorCode::PoolNotTerminated);
-        require!(pool.total_staked == 0, ErrorCode::PoolNotEmpty);
+        // If there are still staked tokens, check if the program has expired
+        let clock = Clock::get()?;
+        if pool.total_staked > 0 {
+            require!(
+                clock.unix_timestamp > exit_deadline(pool.start_time),
+                ErrorCode::PoolNotEmpty
+            ); 
+        }
 
         // Close the pool token account (SPL close_account CPI)
         let pool_state_key = ctx.accounts.pool_state.key();
@@ -802,6 +828,8 @@ pub struct PoolState {
     pub bump: u8,                         // 1
     pub pool_token_bump: u8,              // 1
     pub paused: u8,                       // 1  (0 = active, 1 = paused)
+    pub active_stakers: u32,              // 4
+    pub total_unstaked: u32,              // 4
     pub daily_rewards: [u64; 32],         // 256 (only 0..20 used)
     pub daily_snapshots: [u64; 32],       // 256 (only 0..20 used)
 }
@@ -893,8 +921,10 @@ pub enum ErrorCode {
     PoolNotTerminated,
     #[msg("Pool still has staked funds - all users must unstake first")]
     PoolNotEmpty,
-    #[msg("Daily rewards must sum to exactly STAKING_POOL (100M tokens)")]
+    #[msg("Daily rewards must sum to exactly STAKING_POOL (133M tokens)")]
     InvalidDailyRewards,
+    #[msg("Daily rewards must be in ascending order")]
+    InvalidDailyRewardsOrder,
     #[msg("Pool is paused - operations temporarily disabled")]
     PoolPaused,
     #[msg("Pool is not paused - cannot unpause")]
@@ -923,22 +953,14 @@ pub enum ErrorCode {
     // ── Snapshot Errors ────────────────────────────────────────────────────────
     #[msg("Invalid day - must be between 1 and 20")]
     InvalidDay,
-    #[msg("Snapshot too early - day has not yet elapsed")]
-    SnapshotTooEarly,
     #[msg("Previous day's snapshot must be taken before claims/unstakes")]
     SnapshotRequiredFirst,
-    #[msg("Snapshot already exists for this day - cannot overwrite")]
-    SnapshotAlreadyExists,
     #[msg("Snapshots not completed - must take all 20 snapshots")]
     SnapshotsNotCompleted,
 
     // ── Token Account Errors ───────────────────────────────────────────────────
     #[msg("Invalid pool token account - does not match pool state")]
     InvalidPoolTokenAccount,
-    #[msg("Invalid user token account - mint does not match pool")]
-    InvalidUserTokenMint,
-    #[msg("Invalid admin token account - mint does not match pool")]
-    InvalidAdminTokenMint,
 
     // ── Recovery Errors ────────────────────────────────────────────────────────
     #[msg("Exit window not finished - must wait until day 35")]

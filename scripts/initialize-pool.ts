@@ -1,7 +1,7 @@
 /**
  * initialize-pool.ts
  *
- * Initializes the Memeland Airdrop pool and funds it with 150M $FIGHT tokens.
+ * Initializes the Memeland Airdrop pool and funds it with 200M $FIGHT tokens.
  *
  * Usage:
  *   yarn init-pool:devnet    # uses .env.testnet
@@ -20,7 +20,7 @@
  * What this script does:
  *   1. Reads merkle root from the merkle JSON file
  *   2. Calls initialize_pool(start_time, merkle_root, daily_rewards)
- *   3. Transfers 150M tokens from admin ATA to the pool token account
+ *   3. Transfers 200M tokens from admin ATA to the pool token account
  */
 
 import * as fs from "fs";
@@ -52,7 +52,7 @@ function requireEnv(name: string): string {
   return val;
 }
 
-const TOTAL_SUPPLY = BigInt("150000000000000000"); // 150M with 9 decimals
+const TOTAL_SUPPLY = BigInt("200000000000000000"); // 200M with 9 decimals
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
@@ -146,7 +146,7 @@ async function main() {
   // Start time
   const startTime = startTimeOverride
     ? parseInt(startTimeOverride)
-    : Math.floor(Date.now() / 1000);
+    : Math.floor(Date.now() / 1000) + 300; // default: 5 minutes from now
   const startDate = new Date(startTime * 1000);
   console.log(`\nStart time: ${startTime} (${startDate.toUTCString()})`);
 
@@ -198,9 +198,9 @@ async function main() {
   }
   console.log(`Pool account size: ${poolAccount.data.length} bytes`);
 
-  // ── Step 2: Fund pool with 150M tokens ────────────────────────────────────
+  // ── Step 2: Fund pool with 200M tokens ────────────────────────────────────
 
-  console.log("\n--- Step 2: Fund Pool (150M $FIGHT) ---");
+  console.log("\n--- Step 2: Fund Pool (200M $FIGHT) ---");
 
   // Get admin's ATA
   const adminAta = await getOrCreateAssociatedTokenAccount(

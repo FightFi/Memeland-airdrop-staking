@@ -1,14 +1,14 @@
 # Memeland $FIGHT Airdrop & 20-Day Exponential Staking Program
 
-A Solana smart contract that distributes 150,000,000 $FIGHT tokens through a combined airdrop and staking mechanism over 20 days.
+A Solana smart contract that distributes 200,000,000 $FIGHT tokens through a combined airdrop and staking mechanism over 20 days.
 
 ## Token Distribution
 
 | Pool | Amount | Share |
 |------|--------|-------|
-| Airdrop (pre-staked) | 50,000,000 | 1/3 |
-| Staking rewards | 100,000,000 | 2/3 |
-| **Total** | **150,000,000** | |
+| Airdrop (pre-staked) | 67,000,000 | 1/3 |
+| Staking rewards | 133,000,000 | 2/3 |
+| **Total** | **200,000,000** | |
 
 Token decimals: **9** (amounts are stored as raw units × 10⁹)
 
@@ -44,7 +44,7 @@ Output JSON contains:
 
 ### Exponential Emission Curve
 
-Daily staking rewards follow an exponential curve (K ≈ 0.05):
+Daily staking rewards follow an exponential curve (K ≈ 0.15):
 
 ```
 R(d) = R₁ × e^(k × (d - 1))
@@ -52,12 +52,29 @@ R(d) = R₁ × e^(k × (d - 1))
 
 | Day | Reward (approx) |
 |-----|-----------------|
-| 1   | ~2.98M tokens |
-| 10  | ~4.68M tokens |
-| 20  | ~7.72M tokens |
+| 1   | ~1.13M tokens |
+| 2   | ~1.31M tokens |
+| 3   | ~1.52M tokens |
+| 4   | ~1.77M tokens |
+| 5   | ~2.05M tokens |
+| 6   | ~2.39M tokens |
+| 7   | ~2.77M tokens |
+| 8   | ~3.22M tokens |
+| 9   | ~3.74M tokens |
+| 10  | ~4.35M tokens |
+| 11  | ~5.05M tokens |
+| 12  | ~5.87M tokens |
+| 13  | ~6.82M tokens |
+| 14  | ~7.93M tokens |
+| 15  | ~9.21M tokens |
+| 16  | ~10.70M tokens |
+| 17  | ~12.43M tokens |
+| 18  | ~14.44M tokens |
+| 19  | ~16.78M tokens |
+| 20  | ~19.50M tokens |
 
-- Last 5 days emit ~35% of total staking rewards
-- Rewards are computed off-chain and validated on-chain (must sum to exactly 100M)
+- Last 5 days emit ~56% of total staking rewards
+- Rewards are computed off-chain and validated on-chain (must sum to exactly 133M)
 
 ### Daily Snapshots
 
@@ -120,7 +137,7 @@ Admin can pause the pool at any time to block:
 
 ### Accounts
 
-**PoolState** (zero-copy, PDA: `["pool_state", mint]`)
+**PoolState** (PDA: `["pool_state", mint]`)
 - Admin, mint, token account references, merkle root
 - `daily_rewards[32]` — pre-computed reward curve (indices 0-19 used)
 - `daily_snapshots[32]` — recorded total_staked per day
@@ -256,7 +273,7 @@ yarn init-pool:devnet
 
 ```bash
 # 1. Configure .env.prod with admin wallet, token mint, merkle JSON
-# 2. Ensure admin has SOL + 150M $FIGHT tokens
+# 2. Ensure admin has SOL + 200M $FIGHT tokens
 
 # 3. Deploy
 anchor deploy --provider.cluster mainnet
@@ -358,34 +375,37 @@ await program.methods
 ## Program ID
 
 ```
-4y6rh1SKMAGvunes2gHCeJkEkmPVDLhWYxNg8Zpd7RqH
+4uxX6uS3V9pyP3ei8NWZzz6RsqSddEhwosSqLD3ZbsVs
 ```
 
 ## Error Codes
 
 | Code | Name | Description |
 |------|------|-------------|
-| 6000 | AirdropPoolExhausted | Airdrop pool (50M) fully claimed |
-| 6001 | NothingStaked | No staked balance to unstake |
-| 6002 | Unauthorized | Admin key mismatch |
-| 6003 | InvalidMerkleProof | Proof doesn't verify |
-| 6004 | PoolTerminated | Pool has been terminated |
-| 6005 | AlreadyTerminated | Pool already terminated |
-| 6006 | InvalidDay | Day out of range |
-| 6007 | SnapshotTooEarly | Day not yet elapsed |
-| 6008 | SnapshotRequiredFirst | Previous day's snapshot missing |
-| 6009 | InvalidDailyRewards | Rewards don't sum to STAKING_POOL |
-| 6010 | PoolNotTerminated | Must terminate before closing |
-| 6011 | PoolNotEmpty | Users must unstake before closing |
-| 6012 | ExitWindowNotFinished | Must wait until day 35 |
-| 6013 | NothingToRecover | No tokens to recover |
-| 6014 | SnapshotAlreadyExists | Snapshot already taken for this day |
-| 6015 | UnauthorizedAdmin | Signer is not the pool admin |
-| 6016 | InvalidStakeOwner | UserStake owner mismatch |
-| 6017 | InvalidPoolTokenAccount | Pool token account mismatch |
-| 6018 | PoolPaused | Pool is paused - operations disabled |
-| 6019 | PoolNotPaused | Pool is not paused |
-| 6020 | AlreadyPaused | Pool is already paused |
+| 6000 | StartTimeInPast | Start time is in the past |
+| 6001 | AirdropPoolExhausted | Airdrop pool (67M) fully claimed |
+| 6002 | PoolTerminated | Pool has been terminated |
+| 6003 | AlreadyTerminated | Pool already terminated |
+| 6004 | PoolNotTerminated | Must terminate before closing |
+| 6005 | PoolNotEmpty | Users must unstake before closing |
+| 6006 | InvalidDailyRewards | Rewards don't sum to STAKING_POOL |
+| 6007 | InvalidDailyRewardsOrder | Daily rewards must be ascending |
+| 6008 | PoolPaused | Pool is paused - operations disabled |
+| 6009 | PoolNotPaused | Pool is not paused |
+| 6010 | AlreadyPaused | Pool is already paused |
+| 6011 | ProgramExpired | Program has expired |
+| 6012 | NothingStaked | No staked balance to unstake |
+| 6013 | InvalidStakeOwner | UserStake owner mismatch |
+| 6014 | UnauthorizedAdmin | Signer is not the pool admin |
+| 6015 | Unauthorized | Generic access denied |
+| 6016 | InvalidMerkleProof | Proof doesn't verify |
+| 6017 | InvalidDay | Day out of range |
+| 6018 | SnapshotRequiredFirst | Previous day's snapshot missing |
+| 6019 | SnapshotsNotCompleted | Must take all 20 snapshots |
+| 6020 | InvalidPoolTokenAccount | Pool token account mismatch |
+| 6021 | ExitWindowNotFinished | Must wait until day 35 |
+| 6022 | NothingToRecover | No tokens to recover |
+| 6023 | PoolNotStartedYet | Pool not started yet |
 
 ## Constants
 
@@ -393,8 +413,8 @@ await program.methods
 TOTAL_DAYS = 20              // Program duration
 SECONDS_PER_DAY = 86400      // 24 hours
 EXIT_WINDOW_DAYS = 15        // Grace period after day 20
-AIRDROP_POOL = 50M × 10⁹     // 50M tokens (9 decimals)
-STAKING_POOL = 100M × 10⁹    // 100M tokens (9 decimals)
+AIRDROP_POOL = 67M × 10⁹     // 67M tokens (9 decimals)
+STAKING_POOL = 133M × 10⁹    // 133M tokens (9 decimals)
 ```
 
 ## Security

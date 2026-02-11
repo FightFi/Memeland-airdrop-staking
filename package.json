@@ -12,8 +12,6 @@
     "init-pool:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/initialize-pool.ts",
     "snapshot:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/snapshot.ts",
     "snapshot:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/snapshot.ts",
-    "snapshot:devnet:backfill": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/snapshot.ts --backfill",
-    "snapshot:prod:backfill": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/snapshot.ts --backfill",
     "claim:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/claim.ts",
     "claim:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/claim.ts",
     "pause:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/pause.ts --pause",
@@ -31,7 +29,11 @@
     "stats:devnet:json:save": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --json --save",
     "stats:prod:json:save": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/stats.ts --json --save",
     "rewards:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/calculate-rewards.ts",
-    "rewards:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/calculate-rewards.ts"
+    "rewards:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/calculate-rewards.ts",
+    "unstake-preview:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/unstake-preview.ts",
+    "unstake-preview:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/unstake-preview.ts",
+    "deploy:devnet": "bash scripts/deploy_anchor.sh",
+    "deploy:prod": "CLUSTER=mainnet-beta bash scripts/deploy_anchor.sh"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.31.0",
@@ -42,12 +44,14 @@
     "@types/chai": "^4.3.0",
     "@types/mocha": "^9.0.0",
     "@types/node": "^25.2.0",
+    "anchor-bankrun": "^0.5.0",
     "chai": "^4.3.4",
     "dotenv": "^16.0.0",
     "env-cmd": "^10.1.0",
     "js-sha3": "^0.9.3",
     "mocha": "^9.0.3",
     "prettier": "^2.6.2",
+    "solana-bankrun": "^0.4.0",
     "ts-mocha": "^10.0.0",
     "ts-node": "^10.9.0",
     "typescript": "^4.3.5"
