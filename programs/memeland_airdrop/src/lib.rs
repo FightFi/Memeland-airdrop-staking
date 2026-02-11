@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak;
 use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("4uxX6uS3V9pyP3ei8NWZzz6RsqSddEhwosSqLD3ZbsVs");
+declare_id!("AovZsuC2giiHcTZ7Rn2dz1rd89qB8pPkw1TBZRceQbqq");
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
