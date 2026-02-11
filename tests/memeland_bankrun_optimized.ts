@@ -566,6 +566,36 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
         }
     });
 
+    it("Fails when claiming a different amount than merkle allocation", async () => {
+        const [stake] = getUserStakePda(ePoolState, alice.publicKey);
+        const [marker] = getClaimMarkerPda(ePoolState, alice.publicKey);
+        const aliceAtaE = await getOrCreateATABankrun(ePool, alice.publicKey, alice);
+        const aliceProof = getMerkleProof(multiMerkleLayers, computeLeaf(alice.publicKey, aliceAmount));
+
+        // Try claiming double the allocated amount with alice's valid proof
+        const wrongAmount = aliceAmount.mul(new BN(2));
+        try {
+            await program.methods
+                .claimAirdrop(wrongAmount, aliceProof)
+                .accounts({
+                    user: alice.publicKey,
+                    poolState: ePoolState,
+                    claimMarker: marker,
+                    userStake: stake,
+                    poolTokenAccount: ePoolToken,
+                    userTokenAccount: aliceAtaE,
+                    systemProgram: SystemProgram.programId,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                })
+                .signers([alice])
+                .rpc();
+            expect.fail("Should have failed with InvalidMerkleProof");
+        } catch (e: any) {
+            const msg = e.message || "";
+            expect(msg).to.satisfy((m: string) => m.includes("InvalidMerkleProof") || m.includes("0x178f") || m.includes("6015"));
+        }
+    });
+
     it("Fails on Double Claim (Using Charlie)", async () => {
         const [stake] = getUserStakePda(ePoolState, charlie.publicKey);
         const [marker] = getClaimMarkerPda(ePoolState, charlie.publicKey);
