@@ -178,19 +178,19 @@ pub mod memeland_airdrop {
         require!(pool.paused == 0, ErrorCode::PoolPaused);
         require!(pool.terminated == 0, ErrorCode::PoolTerminated);
 
-        // Check we are on a valid day (1-20)
-        let current_day = get_current_day(pool.start_time, clock.unix_timestamp);
-        require!(
-            current_day >= 1 && current_day <= TOTAL_DAYS,
-            ErrorCode::InvalidDay
-        );
+        // Must be at least day 1 (snapshot records the previous day's state)
+        let raw_day = get_current_day(pool.start_time, clock.unix_timestamp);
+        require!(raw_day >= 1, ErrorCode::InvalidDay);
+
+        // Cap to TOTAL_DAYS for array indexing (days 0..19)
+        let snapshot_day = raw_day.min(TOTAL_DAYS);
 
         let last = pool.snapshot_count as usize;
 
         let mut wrote = false;
 
         // fill ONLY missing days
-        for d in last..(current_day as usize) {
+        for d in last..(snapshot_day as usize) {
             if pool.daily_snapshots[d] == 0 {
                 pool.daily_snapshots[d] = pool.total_staked;
                 wrote = true;
@@ -198,16 +198,16 @@ pub mod memeland_airdrop {
         }
 
         // snapshot_count tracks the highest day snapshotted (upper bound for reward loop)
-        pool.snapshot_count = current_day as u8;
+        pool.snapshot_count = snapshot_day as u8;
 
         if wrote {
             emit!(SnapshotTaken {
-                day: current_day,
+                day: snapshot_day,
                 total_staked: pool.total_staked,
             });
             msg!(
                 "Snapshot {} recorded: total_staked = {}",
-                current_day,
+                snapshot_day,
                 pool.total_staked
             );
         } else {
@@ -215,7 +215,7 @@ pub mod memeland_airdrop {
         }
 
         // log each daily snapshot
-        for d in 0..(current_day as usize) {
+        for d in 0..(snapshot_day as usize) {
             msg!(
                 "Daily snapshot {}: total_staked = {}",
                 d,
@@ -224,10 +224,7 @@ pub mod memeland_airdrop {
         }
         msg!("Start time: {}", pool.start_time);
         msg!("Current time: {}", clock.unix_timestamp);
-        msg!(
-            "Current day: {}",
-            get_current_day(pool.start_time, clock.unix_timestamp)
-        );
+        msg!("Current day (raw): {}", raw_day);
         msg!("Total staked: {}", pool.total_staked);
         msg!("Total airdrop claimed: {}", pool.total_airdrop_claimed);
         msg!("Snapshot count: {}", pool.snapshot_count);
@@ -258,8 +255,10 @@ pub mod memeland_airdrop {
             // After reward window: user can still close their stake, but gets 0 rewards
             0
         } else {
+            // Cap to TOTAL_DAYS for snapshot comparison and reward calculation
+            let current_day = get_current_day(pool.start_time, clock.unix_timestamp)
+                .min(TOTAL_DAYS);
             // Block unstaking if previous day's snapshot hasn't been taken yet
-            let current_day = get_current_day(pool.start_time, clock.unix_timestamp);
             require!(
                 pool.snapshot_count >= current_day as u8,
                 ErrorCode::SnapshotRequiredFirst
@@ -530,17 +529,14 @@ fn transfer_from_pool_pda<'info>(
     token::transfer(transfer_ctx, amount)
 }
 
+/// Returns the actual elapsed day since pool start (uncapped).
+/// Day 0 = first 86400s, Day 1 = next 86400s, etc.
+/// Call sites must cap to TOTAL_DAYS explicitly where needed for array indexing.
 pub fn get_current_day(start_time: i64, now: i64) -> u64 {
     if now <= start_time {
         return 0;
     }
-    let elapsed = (now - start_time) as u64;
-    let day = elapsed / SECONDS_PER_DAY;
-    if day >= TOTAL_DAYS {
-        TOTAL_DAYS
-    } else {
-        day
-    }
+    ((now - start_time) as u64) / SECONDS_PER_DAY
 }
 
 /// Calculate total accumulated rewards for a user across all snapshotted days.
