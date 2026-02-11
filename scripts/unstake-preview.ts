@@ -19,7 +19,7 @@ import { getAccount } from "@solana/spl-token";
 
 const SECONDS_PER_DAY = 86400;
 const TOTAL_DAYS = 20;
-const EXIT_WINDOW_DAYS = 15;
+const REWARD_EXIT_WINDOW_DAYS = 15;
 const AIRDROP_POOL = BigInt("67000000000000000"); // 67M with 9 decimals
 const STAKING_POOL = BigInt("133000000000000000"); // 133M with 9 decimals
 const TOTAL_POOL = AIRDROP_POOL + STAKING_POOL;
@@ -104,14 +104,12 @@ function parsePoolState(data: Buffer): PoolData {
 interface UserStakeData {
   owner: PublicKey;
   stakedAmount: bigint;
-  claimDay: number;
 }
 
 function parseUserStake(data: Buffer): UserStakeData {
   const owner = new PublicKey(data.slice(8, 8 + 32));
   const stakedAmount = data.readBigUInt64LE(8 + 32);
-  const claimDay = Number(data.readBigUInt64LE(8 + 32 + 8));
-  return { owner, stakedAmount, claimDay };
+  return { owner, stakedAmount };
 }
 
 function fmt(amount: bigint): string {
@@ -134,11 +132,11 @@ function formatDuration(seconds: number): string {
 }
 
 /**
- * Replicates on-chain calculate_user_rewards (lib.rs:521-548).
+ * Replicates on-chain calculate_user_rewards (new_lib.rs).
+ * All users earn from day 0.
  */
 function calculateUserRewards(
   stakedAmount: bigint,
-  claimDay: number,
   snapshotCount: number,
   dailyRewards: bigint[],
   dailySnapshots: bigint[]
@@ -146,7 +144,7 @@ function calculateUserRewards(
   let total = 0n;
   const perDay: { day: number; reward: bigint; dailyPool: bigint; snapshot: bigint }[] = [];
 
-  for (let d = claimDay; d < snapshotCount; d++) {
+  for (let d = 0; d < snapshotCount; d++) {
     const snapshotTotal = dailySnapshots[d];
     if (snapshotTotal === 0n) {
       perDay.push({ day: d, reward: 0n, dailyPool: dailyRewards[d], snapshot: 0n });
@@ -204,8 +202,8 @@ async function main() {
   const elapsed = Math.max(0, now - pool.startTime);
   const onChainDay = getOnChainDay(pool.startTime, now);
   const displayDay = onChainDay + 1; // 1-indexed for humans
-  const isExpired = onChainDay > TOTAL_DAYS + EXIT_WINDOW_DAYS;
-  const isInExitWindow = onChainDay > TOTAL_DAYS && !isExpired;
+  const isRewardExpired = onChainDay > TOTAL_DAYS + REWARD_EXIT_WINDOW_DAYS;
+  const isInExitWindow = onChainDay > TOTAL_DAYS && !isRewardExpired;
   const daysRemaining = Math.max(0, TOTAL_DAYS - onChainDay);
 
   // Pool token balance
@@ -343,9 +341,8 @@ async function main() {
     }
   } catch {}
 
-  console.log(`  Staked Amount: ${fmt(userStake.stakedAmount)} tokens`);
-  console.log(`  Claim Day:     ${userStake.claimDay} (on-chain day ${userStake.claimDay})`);
-  console.log(`  Wallet Balance: ${fmt(walletBalance)} tokens (already in wallet)`);
+  console.log(`  Staked Amount: ${fmt(userStake.stakedAmount)} tokens (virtual stake)`);
+  console.log(`  Wallet Balance: ${fmt(walletBalance)} tokens (airdrop received on claim)`);
   console.log(`  Share of Pool: ${pct(userStake.stakedAmount, pool.totalStaked)} of total staked`);
 
   // ═══════════════════════════════════════════════════════════════
@@ -353,25 +350,20 @@ async function main() {
   // ═══════════════════════════════════════════════════════════════
   console.log("\n-- REWARD BREAKDOWN (if unstake today) -----------------------------");
 
-  if (isExpired) {
-    console.log("\n  ** PROGRAM EXPIRED (day > 35) - Rewards = 0 **");
-    console.log(`  You would only receive your principal: ${fmt(userStake.stakedAmount)} tokens`);
+  if (isRewardExpired) {
+    console.log("\n  ** REWARD WINDOW EXPIRED (day > 35) - Rewards = 0 **");
+    console.log(`  Unstaking will return 0 rewards (closes account, recovers ~0.002 SOL rent).`);
+    console.log(`  Your airdrop tokens were already sent to your wallet on claim.`);
     console.log("\n" + "=".repeat(72) + "\n");
     process.exit(0);
   }
 
   const { total: totalRewards, perDay } = calculateUserRewards(
     userStake.stakedAmount,
-    userStake.claimDay,
     pool.snapshotCount,
     pool.dailyRewards,
     pool.dailySnapshots
   );
-
-  // Days before claim
-  if (userStake.claimDay > 0) {
-    console.log(`\n  Indices 0-${userStake.claimDay - 1}: (not eligible - claimed on on-chain day ${userStake.claimDay})`);
-  }
 
   console.log();
   console.log("  Idx | Your Reward            | Your Share  | Daily Pool             | Snapshot Total");
@@ -427,20 +419,18 @@ async function main() {
   // ═══════════════════════════════════════════════════════════════
   // SUMMARY
   // ═══════════════════════════════════════════════════════════════
-  const totalPayout = userStake.stakedAmount + totalRewards;
   const rewardPercentage = userStake.stakedAmount > 0n
     ? ((Number(totalRewards) / Number(userStake.stakedAmount)) * 100).toFixed(2)
     : "0.00";
 
   console.log("\n-- UNSTAKE SUMMARY -------------------------------------------------");
   console.log();
-  console.log(`  Principal (staked):        ${fmt(userStake.stakedAmount).padStart(22)} tokens`);
-  console.log(`  Accumulated Rewards:       ${fmt(totalRewards).padStart(22)} tokens  (+${rewardPercentage}%)`);
-  console.log(`                            ${"─".repeat(22)}`);
-  console.log(`  TOTAL YOU WOULD RECEIVE:   ${fmt(totalPayout).padStart(22)} tokens`);
+  console.log(`  Airdrop (already in wallet): ${fmt(walletBalance).padStart(20)} tokens`);
+  console.log(`  Staking Rewards:             ${fmt(totalRewards).padStart(20)} tokens  (+${rewardPercentage}% of stake)`);
+  console.log(`                               ${"─".repeat(20)}`);
+  console.log(`  REWARDS YOU WOULD RECEIVE:   ${fmt(totalRewards).padStart(20)} tokens`);
   console.log();
-  console.log(`  Already in wallet:         ${fmt(walletBalance).padStart(22)} tokens`);
-  console.log(`  After unstake (wallet):    ${fmt(walletBalance + totalPayout).padStart(22)} tokens`);
+  console.log(`  After unstake (wallet):      ${fmt(walletBalance + totalRewards).padStart(20)} tokens`);
 
   if (pendingDays > 0) {
     console.log();
@@ -471,7 +461,6 @@ async function main() {
   console.log(`  on-chain day:     ${onChainDay}`);
   console.log(`  snapshot_count:   ${pool.snapshotCount}`);
   console.log(`  total_staked raw: ${pool.totalStaked}`);
-  console.log(`  claim_day raw:    ${userStake.claimDay}`);
   console.log(`  staked_amount raw:${userStake.stakedAmount}`);
   for (let i = 0; i < Math.min(pool.snapshotCount + 2, TOTAL_DAYS); i++) {
     console.log(`  daily_snapshots[${i}] raw: ${pool.dailySnapshots[i]}`);

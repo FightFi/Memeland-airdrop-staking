@@ -92,8 +92,8 @@ pub mod memeland_airdrop {
         Ok(())
     }
 
-    /// Claim airdrop via merkle proof. Tokens are auto-staked.
-    /// Creates a permanent ClaimMarker (prevents re-claims) and a UserStake (closed on unstake).
+    /// Claim airdrop via merkle proof. Tokens are sent directly to user wallet.
+    /// Creates a permanent ClaimMarker (prevents re-claims) and a UserStake for reward tracking (closed on unstake).
     pub fn claim_airdrop(
         ctx: Context<ClaimAirdrop>,
         amount: u64,
@@ -112,6 +112,9 @@ pub mod memeland_airdrop {
 
         // Determine which day the user is claiming on
         let current_day = get_current_day(pool.start_time, clock.unix_timestamp);
+
+        // Block claims after the staking period ends (day 20+)
+        require!(current_day < TOTAL_DAYS, ErrorCode::StakingPeriodEnded);
 
         // Verify merkle proof
         let user_bytes = ctx.accounts.user.key().to_bytes();
@@ -235,7 +238,7 @@ pub mod memeland_airdrop {
     }
 
     /// Unstake: permanent exit. Sends all accumulated rewards.
-    /// Blocked if previous day's snapshot hasn't been taken yet.
+    /// After reward window expiry (day 35+), users can still unstake but receive 0 rewards.
     /// Closes the UserStake account and returns rent to user.
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
         let pool_state_key = ctx.accounts.pool_state.key();
@@ -243,41 +246,43 @@ pub mod memeland_airdrop {
         let user_stake = &ctx.accounts.user_stake;
         let clock = Clock::get()?;
 
-        require!(
-            !is_expired(
-                pool.start_time,
-                REWARD_EXIT_WINDOW_DAYS,
-                clock.unix_timestamp
-            ),
-            ErrorCode::RewardExpired
-        );
-
         require!(user_stake.staked_amount > 0, ErrorCode::NothingStaked);
 
-        // Block unstaking if previous day's snapshot hasn't been taken yet
-        let current_day = get_current_day(pool.start_time, clock.unix_timestamp);
-
-        require!(
-            pool.snapshot_count >= current_day as u8,
-            ErrorCode::SnapshotRequiredFirst
+        let expired = is_expired(
+            pool.start_time,
+            REWARD_EXIT_WINDOW_DAYS,
+            clock.unix_timestamp,
         );
 
-        let rewards = calculate_user_rewards(
-            user_stake.staked_amount,
-            current_day,
-            &pool.daily_rewards,
-            &pool.daily_snapshots,
-        );
+        let rewards = if expired {
+            // After reward window: user can still close their stake, but gets 0 rewards
+            0
+        } else {
+            // Block unstaking if previous day's snapshot hasn't been taken yet
+            let current_day = get_current_day(pool.start_time, clock.unix_timestamp);
+            require!(
+                pool.snapshot_count >= current_day as u8,
+                ErrorCode::SnapshotRequiredFirst
+            );
+            calculate_user_rewards(
+                user_stake.staked_amount,
+                current_day,
+                &pool.daily_rewards,
+                &pool.daily_snapshots,
+            )
+        };
 
-        // Transfer tokens via PDA signer
-        transfer_from_pool_pda(
-            &ctx.accounts.token_program,
-            &ctx.accounts.pool_token_account,
-            &ctx.accounts.user_token_account,
-            &pool_state_key,
-            pool.pool_token_bump,
-            rewards,
-        )?;
+        // Transfer tokens via PDA signer (skip if 0 rewards)
+        if rewards > 0 {
+            transfer_from_pool_pda(
+                &ctx.accounts.token_program,
+                &ctx.accounts.pool_token_account,
+                &ctx.accounts.user_token_account,
+                &pool_state_key,
+                pool.pool_token_bump,
+                rewards,
+            )?;
+        }
 
         // Update pool state (UserStake account is closed by Anchor's close constraint)
         pool.total_staked = pool
@@ -315,11 +320,10 @@ pub mod memeland_airdrop {
         pool.terminated = 1;
 
         // Calculate safe drain amount
-        // Reserve: total_staked (principal) + max possible remaining rewards
+        // Reserve only staking rewards (principal was already sent to users on claim)
         let pool_balance = ctx.accounts.pool_token_account.amount;
         let max_remaining_rewards = STAKING_POOL; // Conservative: reserve full staking pool
-        let reserved = (pool.total_staked).saturating_add(max_remaining_rewards);
-        let drainable = pool_balance.saturating_sub(reserved);
+        let drainable = pool_balance.saturating_sub(max_remaining_rewards);
 
         if drainable > 0 {
             transfer_from_pool_pda(
@@ -379,8 +383,9 @@ pub mod memeland_airdrop {
         Ok(())
     }
 
-    /// After exit window, admin can recover unclaimed rewards (not user principal).
-    /// User principal remains protected - users can still unstake after this.
+    /// After reward exit window (day 35+), admin can recover all remaining tokens.
+    /// Since stakes are virtual (airdrop tokens were sent directly to users on claim),
+    /// total_staked represents no real token obligation — the entire balance can be drained.
     pub fn recover_expired_rewards(ctx: Context<RecoverExpiredRewards>) -> Result<()> {
         let pool_state_key = ctx.accounts.pool_state.key();
         let pool = &mut ctx.accounts.pool_state;
@@ -395,10 +400,10 @@ pub mod memeland_airdrop {
             ErrorCode::RewardExitWindowNotFinished
         );
 
-        // Only recover tokens beyond what users have staked (protect principal)
+        // Drain entire balance — total_staked is virtual (no real tokens owed)
         let pool_balance = ctx.accounts.pool_token_account.amount;
-        let amount = pool_balance.saturating_sub(pool.total_staked);
-        require!(amount > 0, ErrorCode::NothingToRecover);
+        require!(pool_balance > 0, ErrorCode::NothingToRecover);
+        let amount = pool_balance;
 
         transfer_from_pool_pda(
             &ctx.accounts.token_program,
@@ -548,10 +553,15 @@ fn calculate_user_rewards(
     let mut total_rewards: u128 = 0;
 
     for d in 0..(current_day as usize) {
+        let snapshot_total = daily_snapshots[d];
+        if snapshot_total == 0 {
+            continue;
+        }
+
         let user_share = (staked_amount as u128)
             .checked_mul(daily_rewards[d] as u128)
             .unwrap()
-            / daily_snapshots[d] as u128;
+            / snapshot_total as u128;
 
         total_rewards = total_rewards.checked_add(user_share).unwrap();
     }
@@ -700,7 +710,7 @@ pub struct Unstake<'info> {
     )]
     pub pool_token_account: Account<'info, TokenAccount>,
 
-    /// User's token account to receive principal + rewards
+    /// User's token account to receive staking rewards
     #[account(
         mut,
         token::mint = pool_state.token_mint,
@@ -937,9 +947,6 @@ pub enum ErrorCode {
     PoolNotPaused,
     #[msg("Pool is already paused")]
     AlreadyPaused,
-    #[msg("Reward has expired - unstakes are no longer accepted")]
-    RewardExpired,
-
     // ── Stake Errors ───────────────────────────────────────────────────────────
     #[msg("Nothing staked - user has no active stake")]
     NothingStaked,
@@ -975,4 +982,6 @@ pub enum ErrorCode {
     NothingToRecover,
     #[msg("Pool not started yet - must wait until start time")]
     PoolNotStartedYet,
+    #[msg("Staking period has ended - claims are no longer accepted")]
+    StakingPeriodEnded,
 }

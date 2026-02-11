@@ -74,8 +74,8 @@
     {
       "name": "claim_airdrop",
       "docs": [
-        "Claim airdrop via merkle proof. Tokens are auto-staked.",
-        "Creates a permanent ClaimMarker (prevents re-claims) and a UserStake (closed on unstake)."
+        "Claim airdrop via merkle proof. Tokens are sent directly to user wallet.",
+        "Creates a permanent ClaimMarker (prevents re-claims) and a UserStake for reward tracking (closed on unstake)."
       ],
       "discriminator": [
         137,
@@ -164,8 +164,26 @@
           }
         },
         {
+          "name": "pool_token_account",
+          "docs": [
+            "Pool's token account - must match the one stored in pool_state"
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_token_account",
+          "docs": [
+            "User's token account to receive airdropped (and staked) tokens"
+          ],
+          "writable": true
+        },
+        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": [
@@ -380,20 +398,21 @@
       "args": []
     },
     {
-      "name": "recover_expired_tokens",
+      "name": "recover_expired_rewards",
       "docs": [
-        "After exit window, admin can recover unclaimed rewards (not user principal).",
-        "User principal remains protected - users can still unstake after this."
+        "After reward exit window (day 35+), admin can recover all remaining tokens.",
+        "Since stakes are virtual (airdrop tokens were sent directly to users on claim),",
+        "total_staked represents no real token obligation — the entire balance can be drained."
       ],
       "discriminator": [
-        39,
-        46,
-        194,
-        145,
-        198,
-        209,
-        250,
-        233
+        131,
+        29,
+        71,
+        229,
+        185,
+        208,
+        189,
+        207
       ],
       "accounts": [
         {
@@ -538,8 +557,8 @@
     {
       "name": "unstake",
       "docs": [
-        "Unstake: permanent exit. Sends principal + all accumulated rewards.",
-        "Blocked if previous day's snapshot hasn't been taken yet.",
+        "Unstake: permanent exit. Sends all accumulated rewards.",
+        "After reward window expiry (day 35+), users can still unstake but receive 0 rewards.",
         "Closes the UserStake account and returns rent to user."
       ],
       "discriminator": [
@@ -606,7 +625,7 @@
         {
           "name": "user_token_account",
           "docs": [
-            "User's token account to receive principal + rewards"
+            "User's token account to receive staking rewards"
           ],
           "writable": true
         },
@@ -836,68 +855,68 @@
     },
     {
       "code": 6011,
-      "name": "ProgramExpired",
-      "msg": "Program has expired - claims are no longer accepted"
-    },
-    {
-      "code": 6012,
       "name": "NothingStaked",
       "msg": "Nothing staked - user has no active stake"
     },
     {
-      "code": 6013,
+      "code": 6012,
       "name": "InvalidStakeOwner",
       "msg": "User does not own this stake account"
     },
     {
-      "code": 6014,
+      "code": 6013,
       "name": "UnauthorizedAdmin",
       "msg": "Unauthorized - caller is not the pool admin"
     },
     {
-      "code": 6015,
+      "code": 6014,
       "name": "Unauthorized",
       "msg": "Unauthorized - generic access denied"
     },
     {
-      "code": 6016,
+      "code": 6015,
       "name": "InvalidMerkleProof",
       "msg": "Invalid merkle proof - verification failed"
     },
     {
-      "code": 6017,
+      "code": 6016,
       "name": "InvalidDay",
       "msg": "Invalid day - must be between 1 and 20"
     },
     {
-      "code": 6018,
+      "code": 6017,
       "name": "SnapshotRequiredFirst",
       "msg": "Previous day's snapshot must be taken before claims/unstakes"
     },
     {
-      "code": 6019,
+      "code": 6018,
       "name": "SnapshotsNotCompleted",
       "msg": "Snapshots not completed - must take all 20 snapshots"
     },
     {
-      "code": 6020,
+      "code": 6019,
       "name": "InvalidPoolTokenAccount",
       "msg": "Invalid pool token account - does not match pool state"
     },
     {
-      "code": 6021,
-      "name": "ExitWindowNotFinished",
-      "msg": "Exit window not finished - must wait until day 35"
+      "code": 6020,
+      "name": "RewardExitWindowNotFinished",
+      "msg": "Reward exit window not finished - must wait until day 15"
     },
     {
-      "code": 6022,
+      "code": 6021,
       "name": "NothingToRecover",
       "msg": "No tokens to recover - pool balance equals staked amount"
     },
     {
-      "code": 6023,
+      "code": 6022,
       "name": "PoolNotStartedYet",
       "msg": "Pool not started yet - must wait until start time"
+    },
+    {
+      "code": 6023,
+      "name": "StakingPeriodEnded",
+      "msg": "Staking period has ended - claims are no longer accepted"
     }
   ],
   "types": [
@@ -1128,10 +1147,6 @@
             "type": "pubkey"
           },
           {
-            "name": "principal",
-            "type": "u64"
-          },
-          {
             "name": "rewards",
             "type": "u64"
           }
@@ -1152,10 +1167,6 @@
           },
           {
             "name": "staked_amount",
-            "type": "u64"
-          },
-          {
-            "name": "claim_day",
             "type": "u64"
           },
           {

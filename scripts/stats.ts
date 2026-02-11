@@ -27,7 +27,8 @@ import { getAccount } from "@solana/spl-token";
 // Constants matching the program
 const TOTAL_DAYS = 20;
 const SECONDS_PER_DAY = 86400;
-const EXIT_WINDOW_DAYS = 15;
+const REWARD_EXIT_WINDOW_DAYS = 15;
+const AIRDROP_EXIT_WINDOW_DAYS = 35;
 const AIRDROP_POOL = BigInt("67000000000000000"); // 67M with 9 decimals
 const STAKING_POOL = BigInt("133000000000000000"); // 133M with 9 decimals
 const TOTAL_POOL = AIRDROP_POOL + STAKING_POOL; // 200M
@@ -155,14 +156,12 @@ function parsePoolState(data: Buffer): PoolData {
 interface UserStakeData {
   owner: PublicKey;
   stakedAmount: bigint;
-  claimDay: number;
 }
 
 function parseUserStake(data: Buffer): UserStakeData {
   const owner = new PublicKey(data.slice(8, 8 + 32));
   const stakedAmount = data.readBigUInt64LE(8 + 32);
-  const claimDay = Number(data.readBigUInt64LE(8 + 32 + 8));
-  return { owner, stakedAmount, claimDay };
+  return { owner, stakedAmount };
 }
 
 interface MerkleJson {
@@ -239,9 +238,11 @@ async function main() {
   const elapsedSeconds = Math.max(0, now - pool.startTime);
   const currentDay = pool.startTime > now ? 0 : Math.floor(elapsedSeconds / SECONDS_PER_DAY);
   const daysRemaining = Math.max(0, TOTAL_DAYS - currentDay + 1);
-  const exitWindowDay = TOTAL_DAYS + EXIT_WINDOW_DAYS;
-  const isInExitWindow = currentDay > TOTAL_DAYS && currentDay <= exitWindowDay;
-  const isExpired = currentDay > exitWindowDay;
+  const rewardExitDay = TOTAL_DAYS + REWARD_EXIT_WINDOW_DAYS;
+  const airdropExitDay = TOTAL_DAYS + AIRDROP_EXIT_WINDOW_DAYS;
+  const isInRewardWindow = currentDay > TOTAL_DAYS && currentDay <= rewardExitDay;
+  const isInAirdropWindow = currentDay > rewardExitDay && currentDay <= airdropExitDay;
+  const isExpired = currentDay > airdropExitDay;
 
   // Load merkle data if available
   let merkleData: MerkleJson | null = null;
@@ -280,7 +281,7 @@ async function main() {
 
   // More accurate: count by fetching UserStake accounts
   const userStakeAccounts = await connection.getProgramAccounts(programId, {
-    filters: [{ dataSize: 8 + 32 + 8 + 8 + 1 }], // UserStake size: discriminator + owner + staked_amount + claim_day + bump
+    filters: [{ dataSize: 8 + 32 + 8 + 1 }], // UserStake size: discriminator + owner + staked_amount + bump
   });
 
   // Parse user stakes for detailed analysis
@@ -329,11 +330,6 @@ async function main() {
   // This is approximate since ClaimMarkers persist
   const estimatedUnstaked = Math.max(0, claimMarkerAccounts.length - activeStakers);
 
-  // Calculate total unstaked principal: everything claimed minus what's still staked
-  const totalUnstakedPrincipal = pool.totalAirdropClaimed > pool.totalStaked
-    ? pool.totalAirdropClaimed - pool.totalStaked
-    : 0n;
-
   // Calculate rewards paid out to unstakers from actual staking data:
   // 1. Sum total rewards distributed across all snapshotted days
   // 2. Subtract pending rewards for active stakers (their share still in the pool)
@@ -345,7 +341,7 @@ async function main() {
 
   let pendingRewardsForActiveStakers = 0n;
   for (const stake of stakes) {
-    for (let d = stake.claimDay; d < pool.snapshotCount && d < TOTAL_DAYS; d++) {
+    for (let d = 0; d < pool.snapshotCount && d < TOTAL_DAYS; d++) {
       const snapshotTotal = pool.dailySnapshots[d];
       if (snapshotTotal === 0n) continue;
       const daily = pool.dailyRewards[d];
@@ -358,8 +354,6 @@ async function main() {
   const totalRewardsPaid = totalRewardsDistributed > pendingRewardsForActiveStakers
     ? totalRewardsDistributed - pendingRewardsForActiveStakers
     : 0n;
-
-  const totalUnstakedAmount = totalUnstakedPrincipal + totalRewardsPaid;
 
   // Calculate claim statistics
   const airdropRemaining = AIRDROP_POOL - pool.totalAirdropClaimed;
@@ -391,9 +385,11 @@ async function main() {
       daysRemaining,
       daysElapsed: Math.min(currentDay, TOTAL_DAYS),
       elapsedTime: formatDuration(elapsedSeconds),
-      isInExitWindow,
+      isInRewardWindow,
+      isInAirdropWindow,
       isExpired,
-      exitWindowEndsDay: exitWindowDay,
+      rewardExitDay,
+      airdropExitDay,
     },
     claims: {
       totalEligibleWallets: eligibleWallets,
@@ -410,12 +406,8 @@ async function main() {
       estimatedUnstaked,
       totalStaked: formatTokens(pool.totalStaked),
       totalStakedRaw: pool.totalStaked.toString(),
-      totalUnstakedPrincipal: formatTokens(totalUnstakedPrincipal),
-      totalUnstakedPrincipalRaw: totalUnstakedPrincipal.toString(),
       totalRewardsPaid: formatTokens(totalRewardsPaid),
       totalRewardsPaidRaw: totalRewardsPaid.toString(),
-      totalUnstakedAmount: formatTokens(totalUnstakedAmount),
-      totalUnstakedAmountRaw: totalUnstakedAmount.toString(),
       averageStake: activeStakers > 0 ? formatTokens(pool.totalStaked / BigInt(activeStakers)) : "0",
       largestStake: formatTokens(largestStake),
       smallestStake: formatTokens(smallestStake),
@@ -428,7 +420,6 @@ async function main() {
         amount: formatTokens(s.stakedAmount),
         amountRaw: s.stakedAmount.toString(),
         share: formatPercent(s.stakedAmount, pool.totalStaked),
-        claimDay: s.claimDay,
       })),
     snapshots: {
       count: pool.snapshotCount,
@@ -452,7 +443,7 @@ async function main() {
     treasury: {
       poolTokenBalance: formatTokens(poolTokenBalance),
       poolTokenBalanceRaw: poolTokenBalance.toString(),
-      stakedPrincipal: formatTokens(pool.totalStaked),
+      virtualStaked: formatTokens(pool.totalStaked),
       unclaimedAirdrop: merkleData ? formatTokens(eligibleAmount - pool.totalAirdropClaimed) : "N/A (no merkle data)",
       stakingRewardsMax: formatTokens(STAKING_POOL),
     },
@@ -503,10 +494,12 @@ async function main() {
   const progressBar = "█".repeat(Math.floor(progressPct / 5)) + "░".repeat(20 - Math.floor(progressPct / 5));
   log(`│  Progress:     [${progressBar}] ${progressPct.toFixed(0)}%`);
 
-  if (isInExitWindow) {
-    log(`│  ⚠️  IN EXIT WINDOW - Users can still unstake`);
+  if (isInRewardWindow) {
+    log(`│  ⚠️  IN REWARD EXIT WINDOW (day ${TOTAL_DAYS + 1}-${rewardExitDay}) - Users can still unstake for rewards`);
+  } else if (isInAirdropWindow) {
+    log(`│  ⚠️  REWARD WINDOW EXPIRED - Admin can recover all tokens. Users unstake for 0 rewards.`);
   } else if (isExpired) {
-    log(`│  ⚠️  EXIT WINDOW EXPIRED - Admin can recover tokens`);
+    log(`│  ⚠️  ALL WINDOWS EXPIRED - Admin can close pool`);
   }
   log("└─────────────────────────────────────────────────────────────────┘");
 
@@ -530,9 +523,7 @@ async function main() {
   log("\n┌─ STAKING ───────────────────────────────────────────────────────┐");
   log(`│  Active Stakers:   ${pool.activeStakers.toLocaleString()} (on-chain)`);
   log(`│  Unstaked:         ${pool.totalUnstaked.toLocaleString()} users (on-chain)`);
-  log(`│  Unstaked Amount:  ${formatTokens(totalUnstakedAmount)} tokens`);
-  log(`│    Principal:      ${formatTokens(totalUnstakedPrincipal)} tokens`);
-  log(`│    Rewards:        ${formatTokens(totalRewardsPaid)} tokens`);
+  log(`│  Rewards Paid:     ${formatTokens(totalRewardsPaid)} tokens`);
   log(`│  Total Staked:     ${formatTokens(pool.totalStaked)} tokens`);
   if (pool.activeStakers > 0) {
     log(`│  Average Stake:    ${formatTokens(pool.totalStaked / BigInt(pool.activeStakers))} tokens`);
@@ -549,7 +540,7 @@ async function main() {
       const s = sorted[i];
       const pct = formatPercent(s.stakedAmount, pool.totalStaked);
       log(`│  ${(i + 1).toString().padStart(2)}. ${s.owner.toBase58()}`);
-      log(`│      ${formatTokens(s.stakedAmount).padStart(20)} tokens (${pct}) — claimed day ${s.claimDay}`);
+      log(`│      ${formatTokens(s.stakedAmount).padStart(20)} tokens (${pct})`);
     }
     log("└─────────────────────────────────────────────────────────────────┘");
   }
@@ -597,7 +588,7 @@ async function main() {
   // Treasury
   log("\n┌─ TREASURY ──────────────────────────────────────────────────────┐");
   log(`│  Pool Token Balance:     ${formatTokens(poolTokenBalance)} tokens`);
-  log(`│  ├─ Staked (principal):  ${formatTokens(pool.totalStaked)} tokens`);
+  log(`│  ├─ Virtual staked:     ${formatTokens(pool.totalStaked)} tokens (no real obligation)`);
   if (merkleData) {
     const unclaimedAirdrop = eligibleAmount - pool.totalAirdropClaimed;
     log(`│  ├─ Unclaimed airdrop:  ${formatTokens(unclaimedAirdrop)} tokens`);
