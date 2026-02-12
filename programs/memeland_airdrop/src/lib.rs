@@ -213,23 +213,6 @@ pub mod memeland_airdrop {
             msg!("No snapshots needed for today.");
         }
 
-        // log each daily snapshot
-        for d in 0..(snapshot_day as usize) {
-            msg!(
-                "Daily snapshot {}: total_staked = {}",
-                d,
-                pool.daily_snapshots[d]
-            );
-        }
-        msg!("Start time: {}", pool.start_time);
-        msg!("Current time: {}", clock.unix_timestamp);
-        msg!("Current day (raw): {}", raw_day);
-        msg!("Total staked: {}", pool.total_staked);
-        msg!("Total airdrop claimed: {}", pool.total_airdrop_claimed);
-        msg!("Snapshot count: {}", pool.snapshot_count);
-        msg!("Daily snapshots: {:?}", pool.daily_snapshots);
-        msg!("Active stakers: {}", pool.active_stakers);
-        msg!("Total unstaked: {}", pool.total_unstaked);
         Ok(())
     }
 
