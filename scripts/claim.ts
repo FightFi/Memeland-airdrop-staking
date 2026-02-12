@@ -23,6 +23,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as readline from "readline";
 import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from "@solana/spl-token";
 import * as anchor from "@coral-xyz/anchor";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
 
@@ -172,10 +173,17 @@ async function main() {
     [Buffer.from("user_stake"), poolState.toBuffer(), userPubkey.toBuffer()],
     programId
   );
+  const [poolTokenAccount] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool_token"), poolState.toBuffer()],
+    programId
+  );
+  const userTokenAccount = await getAssociatedTokenAddress(tokenMint, userPubkey);
 
   console.log(`\n   Pool State:    ${poolState.toBase58()}`);
   console.log(`   Claim Marker:  ${claimMarker.toBase58()}`);
   console.log(`   User Stake:    ${userStake.toBase58()}`);
+  console.log(`   Pool Token:    ${poolTokenAccount.toBase58()}`);
+  console.log(`   User Token:    ${userTokenAccount.toBase58()}`);
 
   // Check pool state
   const poolAccount = await connection.getAccountInfo(poolState);
@@ -276,7 +284,10 @@ async function main() {
         poolState,
         claimMarker,
         userStake,
+        poolTokenAccount,
+        userTokenAccount,
         systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
       })
       .signers([userKeypair])
       .rpc();
@@ -284,8 +295,8 @@ async function main() {
     console.log(`\n✅ Claim successful!`);
     console.log(`   TX: ${tx}`);
     console.log(`   Amount: ${claimData.amount} tokens`);
-    console.log(`\n   Tokens are now staked and earning rewards.`);
-    console.log(`   Call unstake() when ready to withdraw.`);
+    console.log(`\n   Tokens sent to your wallet. Earning staking rewards from day 0.`);
+    console.log(`   Call unstake() before day 35 to collect rewards.`);
   } catch (err: any) {
     const errMsg = err.message || String(err);
 
@@ -297,8 +308,8 @@ async function main() {
       console.error("\n❌ Failed: Invalid merkle proof.");
     } else if (errMsg.includes("AirdropPoolExhausted")) {
       console.error("\n❌ Failed: Airdrop pool exhausted (67M limit reached).");
-    } else if (errMsg.includes("SnapshotRequiredFirst")) {
-      console.error("\n❌ Failed: Previous day's snapshot required. Contact admin.");
+    } else if (errMsg.includes("StakingPeriodEnded")) {
+      console.error("\n❌ Failed: Staking period has ended — claims no longer accepted.");
     } else if (errMsg.includes("already in use")) {
       console.error("\n❌ Failed: Already claimed (ClaimMarker exists).");
     } else {

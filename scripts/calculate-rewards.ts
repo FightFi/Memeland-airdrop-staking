@@ -120,14 +120,12 @@ function parsePoolState(data: Buffer): PoolData {
 interface UserStakeData {
   owner: PublicKey;
   stakedAmount: bigint;
-  claimDay: number;
 }
 
 function parseUserStake(data: Buffer): UserStakeData {
   const owner = new PublicKey(data.slice(8, 8 + 32));
   const stakedAmount = data.readBigUInt64LE(8 + 32);
-  const claimDay = Number(data.readBigUInt64LE(8 + 32 + 8));
-  return { owner, stakedAmount, claimDay };
+  return { owner, stakedAmount };
 }
 
 function formatTokens(amount: bigint, decimals = 9): string {
@@ -139,21 +137,18 @@ function formatTokens(amount: bigint, decimals = 9): string {
 }
 
 /**
- * Replicate on-chain calculate_user_rewards (lib.rs:546-574).
- * Uses BigInt for u128 precision matching the Rust implementation.
+ * Replicate on-chain calculate_user_rewards (new_lib.rs).
+ * All users earn from day 0. Uses BigInt for u128 precision.
  */
 function calculateUserRewards(
   stakedAmount: bigint,
-  claimDay: number,
   snapshotCount: number,
   dailyRewards: bigint[],
   dailySnapshots: bigint[]
 ): bigint {
   let totalRewards = 0n;
 
-  const start = claimDay;
-
-  for (let d = start; d < snapshotCount; d++) {
+  for (let d = 0; d < snapshotCount; d++) {
     const snapshotTotal = dailySnapshots[d];
     if (snapshotTotal === 0n) {
       continue;
@@ -230,10 +225,9 @@ async function main() {
   }
   const userStake = parseUserStake(userStakeAccount.data);
 
-  // Calculate rewards
+  // Calculate rewards (all users earn from day 0)
   const totalRewards = calculateUserRewards(
     userStake.stakedAmount,
-    userStake.claimDay,
     pool.snapshotCount,
     pool.dailyRewards,
     pool.dailySnapshots
@@ -256,17 +250,15 @@ async function main() {
   console.log("=== Reward Calculator ===");
   console.log(`Address:        ${userPubkey.toBase58()}`);
   console.log(`Wallet Balance: ${formatTokens(walletBalance)} tokens (Unstaked)`);
-  console.log(`Staked Amount:  ${formatTokens(userStake.stakedAmount)} tokens (Staked)`);
-  console.log(`Claim Day:      ${userStake.claimDay}`);
+  console.log(`Staked Amount:  ${formatTokens(userStake.stakedAmount)} tokens (virtual stake)`);
   console.log(`Current Day:    ${currentDay}`);
   console.log(`Snapshots:      ${pool.snapshotCount}`);
   console.log();
 
-  // Per-day breakdown
-  const start = userStake.claimDay;
+  // Per-day breakdown (all users earn from day 0)
   let runningTotal = 0n;
 
-  for (let d = start; d < pool.snapshotCount; d++) {
+  for (let d = 0; d < pool.snapshotCount; d++) {
     const snapshotTotal = pool.dailySnapshots[d];
     if (snapshotTotal === 0n) {
       console.log(
@@ -285,10 +277,10 @@ async function main() {
   }
 
   console.log();
-  const principalPlusRewards = userStake.stakedAmount + totalRewards;
   console.log(
-    `Total Rewards:  ${formatTokens(totalRewards)} tokens (principal + rewards = ${formatTokens(principalPlusRewards)})`
+    `Total Rewards:  ${formatTokens(totalRewards)} tokens`
   );
+  console.log(`(Airdrop tokens were sent to wallet on claim — unstake returns rewards only)`);
   console.log();
 }
 
