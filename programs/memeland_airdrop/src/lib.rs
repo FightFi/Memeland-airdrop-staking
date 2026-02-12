@@ -190,10 +190,8 @@ pub mod memeland_airdrop {
 
         // fill ONLY missing days
         for d in last..(snapshot_day as usize) {
-            if pool.daily_snapshots[d] == 0 {
-                pool.daily_snapshots[d] = pool.total_staked;
-                wrote = true;
-            }
+            pool.daily_snapshots[d] = pool.total_staked;
+            wrote = true;
         }
 
         // snapshot_count tracks the highest day snapshotted (upper bound for reward loop)
