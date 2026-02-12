@@ -323,16 +323,12 @@ pub mod memeland_airdrop {
             pool.total_staked
         };
 
-        let reward = if snapshot_total > 0 {
-            let daily = pool.daily_rewards[day_idx] as u128;
-            let user_share = (user_stake.staked_amount as u128)
-                .checked_mul(daily)
-                .unwrap()
-                / (snapshot_total as u128);
-            user_share as u64
-        } else {
-            0
-        };
+        let daily = pool.daily_rewards[day_idx] as u128;
+        let reward = (user_stake.staked_amount as u128)
+            .checked_mul(daily)
+            .unwrap()
+            .checked_div(snapshot_total as u128)
+            .unwrap_or(0) as u64;
 
         msg!("Day {} reward: {}", day, reward);
         Ok(())
@@ -465,15 +461,13 @@ fn calculate_user_rewards(
     let mut total_rewards: u128 = 0;
 
     for d in 0..(current_day as usize) {
-        let snapshot_total = daily_snapshots[d];
-        if snapshot_total == 0 {
-            continue;
-        }
+        let snapshot_total = daily_snapshots[d] as u128;
 
         let user_share = (staked_amount as u128)
             .checked_mul(daily_rewards[d] as u128)
             .unwrap()
-            / snapshot_total as u128;
+            .checked_div(snapshot_total)
+            .unwrap_or(0);
 
         total_rewards = total_rewards.checked_add(user_share).unwrap();
     }
