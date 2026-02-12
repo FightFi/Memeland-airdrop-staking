@@ -465,6 +465,21 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
         expect(msg).to.satisfy((m: string) => m.includes("PoolPaused") || m.includes("6005") || m.includes("0x1775"));
     }
 
+    // Edge case: Unstake while paused should SUCCEED (user funds always accessible)
+    const aliceBalBefore = (await getAccountBankrun(aliceAtaPause))!.amount;
+    await program.methods.unstake()
+        .accounts({
+            user: alice.publicKey,
+            poolState: pState,
+            userStake: aliceStake,
+            poolTokenAccount: pToken,
+            userTokenAccount: aliceAtaPause,
+            tokenProgram: TOKEN_PROGRAM_ID,
+        }).signers([alice]).rpc();
+    const aliceBalAfter = (await getAccountBankrun(aliceAtaPause))!.amount;
+    // Should have received airdrop (on claim) + rewards (on unstake)
+    expect(aliceBalAfter >= aliceBalBefore).to.be.true;
+
     await program.methods.unpausePool().accounts({ admin: admin.publicKey, poolState: pState }).signers([admin]).rpc();
     state = await program.account.poolState.fetch(pState);
     expect(state.paused).to.equal(0);
@@ -640,7 +655,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
             expect.fail("Snapshot before start should fail");
         } catch (e: any) {
             const msg = e.message || "";
-            expect(msg).to.satisfy((m: string) => m.includes("InvalidDay") || m.includes("6028") || m.includes("PoolNotStartedYet"));
+            expect(msg).to.satisfy((m: string) => m.includes("InvalidDay") || m.includes("6013") || m.includes("PoolNotStartedYet"));
         }
     });
   });
@@ -1393,6 +1408,29 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
       ), [admin]);
     });
 
+    it("UnauthorizedAdmin: non-admin cannot recover", async () => {
+      await warpTo(reStart + 36 * SECONDS_PER_DAY);
+      const aliceAta = await getOrCreateATABankrun(rePool, alice.publicKey, alice);
+
+      try {
+        await program.methods.recoverExpiredRewards()
+          .accounts({
+            admin: alice.publicKey,
+            poolState: rePoolState,
+            poolTokenAccount: rePoolToken,
+            adminTokenAccount: aliceAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          }).signers([alice]).rpc();
+        expect.fail("Should have failed with UnauthorizedAdmin");
+      } catch (e: any) {
+        const msg = (e.message || "").toString();
+        expect(msg).to.satisfy((m: string) => m.includes("UnauthorizedAdmin") || m.includes("6010") || m.includes("0x177a") || m.includes("ConstraintRaw"));
+      }
+
+      // Reset time for next test
+      await warpTo(reStart + 1 * SECONDS_PER_DAY);
+    });
+
     it("ClaimWindowStillOpen: recover on Day 21 (before Day 35)", async () => {
       await warpTo(reStart + 21 * SECONDS_PER_DAY);
       const adminAta = await getOrCreateATABankrun(rePool, admin.publicKey);
@@ -1450,7 +1488,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
     });
   });
 
-  describe("recover_expired_rewards error paths", () => {
+  describe("recover_expired_rewards termination paths", () => {
     let tpPool: PublicKey;
     let tpPoolState: PublicKey;
     let tpPoolToken: PublicKey;
@@ -1814,6 +1852,54 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
         const msg = (e.message || "").toString();
         expect(msg).to.satisfy((m: string) => m.includes("SnapshotRequiredFirst") || m.includes("6014") || m.includes("0x177e"));
       }
+    });
+  });
+
+  describe("Day 0 unstake edge case", () => {
+    it("unstake on day 0 succeeds with 0 rewards", async () => {
+      const d0Pool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
+      const [d0PoolState] = getPoolStatePda(d0Pool);
+      const [d0PoolToken] = getPoolTokenPda(d0PoolState);
+
+      const d0User = Keypair.generate();
+      const d0Amount = new BN(1_000_000).mul(new BN(1e9));
+      const d0Merkle = buildMerkleTree([computeLeaf(d0User.publicKey, d0Amount)]);
+      const d0Start = Math.floor(Date.now() / 1000) + 1000;
+
+      await fundAccount(d0User.publicKey);
+      await warpTo(d0Start - 100);
+
+      await program.methods.initializePool(new BN(d0Start), Array.from(getMerkleRoot(d0Merkle)), computeDailyRewards())
+        .accounts({ admin: admin.publicKey, poolState: d0PoolState, tokenMint: d0Pool, poolTokenAccount: d0PoolToken, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
+        .signers([admin]).rpc();
+
+      const adminAta = await getOrCreateATABankrun(d0Pool, admin.publicKey);
+      await provider.sendAndConfirm(new anchor.web3.Transaction().add(
+        createMintToInstruction(d0Pool, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
+        createTransferInstruction(adminAta, d0PoolToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
+      ), [admin]);
+
+      // Claim on day 0 (just after start, no snapshots taken)
+      await warpTo(d0Start + 1);
+      const [d0Stake] = getUserStakePda(d0PoolState, d0User.publicKey);
+      const [d0Marker] = getClaimMarkerPda(d0PoolState, d0User.publicKey);
+      const d0UserAta = await getOrCreateATABankrun(d0Pool, d0User.publicKey, d0User);
+
+      await program.methods.claimAirdrop(d0Amount, getMerkleProof(d0Merkle, computeLeaf(d0User.publicKey, d0Amount)))
+        .accounts({ user: d0User.publicKey, poolState: d0PoolState, claimMarker: d0Marker, userStake: d0Stake, poolTokenAccount: d0PoolToken, userTokenAccount: d0UserAta, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID })
+        .signers([d0User]).rpc();
+
+      // Unstake immediately on day 0 (current_day=0, no snapshots needed, 0 rewards)
+      const clock = await context.banksClient.getClock();
+      await warpTo(Number(clock.unixTimestamp) + 1);
+
+      await program.methods.unstake()
+        .accounts({ user: d0User.publicKey, poolState: d0PoolState, userStake: d0Stake, poolTokenAccount: d0PoolToken, userTokenAccount: d0UserAta, tokenProgram: TOKEN_PROGRAM_ID })
+        .signers([d0User]).rpc();
+
+      // User should only have the airdrop tokens (0 rewards on day 0)
+      const bal = (await getAccountBankrun(d0UserAta))!.amount;
+      expect(bal).to.equal(BigInt(d0Amount.toString()));
     });
   });
 
