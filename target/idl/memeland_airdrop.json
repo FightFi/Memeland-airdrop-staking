@@ -205,49 +205,6 @@
       ]
     },
     {
-      "name": "close_pool",
-      "docs": [
-        "Close pool state and token accounts, return rent to admin.",
-        "Only allowed after pool is terminated AND all users have unstaked."
-      ],
-      "discriminator": [
-        140,
-        189,
-        209,
-        23,
-        239,
-        62,
-        239,
-        11
-      ],
-      "accounts": [
-        {
-          "name": "admin",
-          "docs": [
-            "Must be the pool admin to close"
-          ],
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "pool_state",
-          "writable": true
-        },
-        {
-          "name": "pool_token_account",
-          "docs": [
-            "Pool's token account - must match and have zero balance to close"
-          ],
-          "writable": true
-        },
-        {
-          "name": "token_program",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "initialize_pool",
       "docs": [
         "Initialize pool with merkle root and pre-computed daily rewards."
@@ -400,9 +357,11 @@
     {
       "name": "recover_expired_rewards",
       "docs": [
-        "After reward exit window (day 35+), admin can recover all remaining tokens.",
+        "After claim window (day 35+), admin recovers all remaining tokens and terminates pool.",
+        "Sets terminated = 1 (blocks future claims/snapshots) and drains entire balance.",
         "Since stakes are virtual (airdrop tokens were sent directly to users on claim),",
-        "total_staked represents no real token obligation — the entire balance can be drained."
+        "total_staked represents no real token obligation — the entire balance can be drained.",
+        "Can be called again if tokens are sent to the pool after first recovery."
       ],
       "discriminator": [
         131,
@@ -477,54 +436,6 @@
       "args": []
     },
     {
-      "name": "terminate_pool",
-      "docs": [
-        "Admin terminates pool. Caps rewards, returns surplus to admin."
-      ],
-      "discriminator": [
-        148,
-        152,
-        145,
-        15,
-        142,
-        221,
-        5,
-        39
-      ],
-      "accounts": [
-        {
-          "name": "admin",
-          "docs": [
-            "Must be the pool admin to terminate"
-          ],
-          "signer": true
-        },
-        {
-          "name": "pool_state",
-          "writable": true
-        },
-        {
-          "name": "pool_token_account",
-          "docs": [
-            "Pool's token account - must match the one stored in pool_state"
-          ],
-          "writable": true
-        },
-        {
-          "name": "admin_token_account",
-          "docs": [
-            "Admin's token account to receive drained tokens"
-          ],
-          "writable": true
-        },
-        {
-          "name": "token_program",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "unpause_pool",
       "docs": [
         "Unpause pool - resumes normal operations."
@@ -558,7 +469,7 @@
       "name": "unstake",
       "docs": [
         "Unstake: permanent exit. Sends all accumulated rewards.",
-        "After reward window expiry (day 35+), users can still unstake but receive 0 rewards.",
+        "After claim window (day 35+), users can still unstake but receive 0 rewards.",
         "Closes the UserStake account and returns rent to user."
       ],
       "discriminator": [
@@ -693,19 +604,6 @@
       ]
     },
     {
-      "name": "PoolClosed",
-      "discriminator": [
-        106,
-        46,
-        29,
-        231,
-        42,
-        44,
-        73,
-        119
-      ]
-    },
-    {
       "name": "PoolInitialized",
       "discriminator": [
         100,
@@ -729,19 +627,6 @@
         164,
         150,
         122
-      ]
-    },
-    {
-      "name": "PoolTerminated",
-      "discriminator": [
-        201,
-        228,
-        71,
-        56,
-        128,
-        0,
-        210,
-        109
       ]
     },
     {
@@ -815,108 +700,88 @@
     },
     {
       "code": 6003,
-      "name": "AlreadyTerminated",
-      "msg": "Pool is already terminated - cannot terminate twice"
-    },
-    {
-      "code": 6004,
-      "name": "PoolNotTerminated",
-      "msg": "Pool must be terminated before closing"
-    },
-    {
-      "code": 6005,
-      "name": "PoolNotEmpty",
-      "msg": "Pool still has staked funds - all users must unstake first"
-    },
-    {
-      "code": 6006,
       "name": "InvalidDailyRewards",
       "msg": "Daily rewards must sum to exactly STAKING_POOL (133M tokens)"
     },
     {
-      "code": 6007,
+      "code": 6004,
       "name": "InvalidDailyRewardsOrder",
       "msg": "Daily rewards must be in ascending order"
     },
     {
-      "code": 6008,
+      "code": 6005,
       "name": "PoolPaused",
       "msg": "Pool is paused - operations temporarily disabled"
     },
     {
-      "code": 6009,
+      "code": 6006,
       "name": "PoolNotPaused",
       "msg": "Pool is not paused - cannot unpause"
     },
     {
-      "code": 6010,
+      "code": 6007,
       "name": "AlreadyPaused",
       "msg": "Pool is already paused"
     },
     {
-      "code": 6011,
+      "code": 6008,
       "name": "NothingStaked",
       "msg": "Nothing staked - user has no active stake"
     },
     {
-      "code": 6012,
+      "code": 6009,
       "name": "InvalidStakeOwner",
       "msg": "User does not own this stake account"
     },
     {
-      "code": 6013,
+      "code": 6010,
       "name": "UnauthorizedAdmin",
       "msg": "Unauthorized - caller is not the pool admin"
     },
     {
-      "code": 6014,
+      "code": 6011,
       "name": "Unauthorized",
       "msg": "Unauthorized - generic access denied"
     },
     {
-      "code": 6015,
+      "code": 6012,
       "name": "InvalidMerkleProof",
       "msg": "Invalid merkle proof - verification failed"
     },
     {
-      "code": 6016,
+      "code": 6013,
       "name": "InvalidDay",
-      "msg": "Invalid day - must be between 1 and 20"
+      "msg": "Invalid day for this operation"
     },
     {
-      "code": 6017,
+      "code": 6014,
       "name": "SnapshotRequiredFirst",
       "msg": "Previous day's snapshot must be taken before claims/unstakes"
     },
     {
-      "code": 6018,
-      "name": "SnapshotsNotCompleted",
-      "msg": "Snapshots not completed - must take all 20 snapshots"
-    },
-    {
-      "code": 6019,
+      "code": 6015,
       "name": "InvalidPoolTokenAccount",
       "msg": "Invalid pool token account - does not match pool state"
     },
     {
-      "code": 6020,
-      "name": "RewardExitWindowNotFinished",
-      "msg": "Reward exit window not finished - must wait until day 15"
-    },
-    {
-      "code": 6021,
+      "code": 6016,
       "name": "NothingToRecover",
       "msg": "No tokens to recover - pool balance equals staked amount"
     },
     {
-      "code": 6022,
+      "code": 6017,
       "name": "PoolNotStartedYet",
       "msg": "Pool not started yet - must wait until start time"
     },
     {
-      "code": 6023,
+      "code": 6018,
       "name": "StakingPeriodEnded",
       "msg": "Staking period has ended - claims are no longer accepted"
+    },
+    {
+      "code": 6019,
+      "name": "ClaimWindowStillOpen",
+      "msg": "Claim window still open - cannot terminate until day 35"
     }
   ],
   "types": [
@@ -954,13 +819,6 @@
             "type": "u8"
           }
         ]
-      }
-    },
-    {
-      "name": "PoolClosed",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     },
     {
@@ -1081,18 +939,6 @@
                 32
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "PoolTerminated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "drained_amount",
-            "type": "u64"
           }
         ]
       }

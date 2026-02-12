@@ -1,6 +1,6 @@
-# Memeland $FIGHT Airdrop & 20-Day Exponential Staking Program
+# Memeland $FIGHT Airdrop & Exponential Staking Program
 
-A Solana smart contract that distributes 200,000,000 $FIGHT tokens through a combined airdrop and staking rewards mechanism over 20 days.
+A Solana smart contract that distributes 200,000,000 $FIGHT tokens through a combined airdrop and staking rewards mechanism. Rewards are computed over 20 days with an exponential curve, and users have a 35-day claim window.
 
 ## Token Distribution
 
@@ -22,7 +22,7 @@ Token decimals: **9** (amounts are stored as raw units × 10⁹)
 - **Claimed tokens are sent directly to the user's wallet** on claim
 - A virtual staking record (`UserStake`) is created to track reward accrual
 - Each wallet can only claim once (enforced by `ClaimMarker`)
-- Claims are only accepted during the 20-day staking period
+- Claims are accepted during the 35-day claim window (`CLAIM_WINDOW_DAYS`)
 
 ### Merkle Allowlist
 
@@ -102,39 +102,39 @@ R(d) = R₁ × e^(k × (d - 1))
 
 - `unstake` is **permanent** — no re-entry
 - Returns **accumulated staking rewards only** (airdrop tokens were already sent on claim)
-- After the reward window (day 35+), users can still unstake but receive **0 rewards**
+- After the claim window (day 35+), users can still unstake but receive **0 rewards**
 - `UserStake` account is closed (rent returned to user)
 - `ClaimMarker` persists forever (prevents re-claiming)
 
 ### Pool Lifecycle
 
 ```
-Day 0-20: Active staking period
+Day 0-20: Active staking period (snapshots + rewards accumulate)
   - Users claim airdrop (tokens sent to wallet immediately)
   - Anyone takes daily snapshots
   - Users can unstake anytime (receives accumulated rewards)
   - Admin can pause/unpause for emergencies
 
-Day 20-35: Reward exit window (15 days grace period)
-  - No new claims (staking period ended)
-  - Users can still unstake with full accumulated rewards
-  - Admin terminates pool (recovers excess tokens)
+Day 0-34: Claim window (CLAIM_WINDOW_DAYS = 35)
+  - Users can claim their airdrop via merkle proof
+  - Claims after day 20 still earn full rewards (virtual staking from day 0)
 
-Day 35-55: Post-reward window
-  - Admin recovers all remaining tokens (entire pool balance drained)
+Day 20-34: Post-staking, claims still open
+  - No new snapshots (capped at 20 days)
+  - Users can still claim and unstake with full accumulated rewards
+
+Day 35+: Everything expires
+  - Admin recovers all remaining tokens (sets terminated = 1)
   - Users can still unstake (0 rewards, but closes account and returns rent)
-
-After Day 55:
-  - Admin can close pool (pool already drained by recovery)
-  - Pool token account closed, rent returned to admin
 ```
 
-### Dual Exit Windows
+### Exit Windows
 
 | Window | Period | Purpose |
 |--------|--------|---------|
-| **Reward exit** | Day 20-35 (15 days) | Users unstake for rewards. Admin drains entire pool balance after day 35. |
-| **Airdrop exit** | Day 20-55 (35 days) | Grace period before admin can force-close pool. |
+| **Staking** | Day 0-19 (20 days) | Snapshots taken, rewards accumulate. |
+| **Claim window** | Day 0-34 (35 days) | Users claim airdrop and earn rewards from day 0. |
+| **Post claim window** | Day 35+ | Admin recovers tokens (terminates pool). Users unstake with 0 rewards. |
 
 ### Emergency Pause
 
@@ -176,9 +176,7 @@ Admin can pause the pool at any time to block:
 | `unstake()` | user | Exit: returns staking rewards (0 after day 35), closes UserStake |
 | `pause_pool()` | admin | Emergency pause — blocks claims/snapshots |
 | `unpause_pool()` | admin | Resume normal operations |
-| `terminate_pool()` | admin | After all snapshots: stops claims, drains excess tokens |
-| `recover_expired_rewards()` | admin | After day 35: drain entire remaining pool balance (stakes are virtual) |
-| `close_pool()` | admin | After day 55 (or when empty): close all pool accounts |
+| `recover_expired_rewards()` | admin | After day 35: terminates pool, drains entire balance |
 | `calculate_rewards(day)` | none | View: logs user's reward for a specific day |
 
 ### Events
@@ -190,9 +188,7 @@ SnapshotTaken { day, total_staked }
 Unstaked { user, rewards }
 PoolPausedEvent { admin }
 PoolUnpausedEvent { admin }
-PoolTerminated { drained_amount }
 TokensRecovered { amount }
-PoolClosed {}
 ```
 
 ## Project Structure
@@ -200,8 +196,7 @@ PoolClosed {}
 ```
 memeland-airdrop/
 ├── programs/memeland_airdrop/src/
-│   ├── lib.rs                                # Current smart contract
-│   └── new_lib.rs                            # Updated smart contract (new business logic)
+│   └── lib.rs                                # Smart contract
 ├── target/idl/memeland_airdrop.json          # IDL
 ├── tests/memeland_bankrun_optimized.ts       # Test suite (bankrun)
 ├── scripts/
@@ -346,26 +341,10 @@ await program.methods
   .rpc();
 ```
 
-### Termination (After Day 20, all snapshots completed)
+### Recovery & Termination (After Day 35)
 
 ```typescript
-// Terminate pool — blocks new claims, recovers excess tokens
-await program.methods
-  .terminatePool()
-  .accounts({
-    admin: adminPubkey,
-    poolState: poolStatePda,
-    poolTokenAccount: poolTokenPda,
-    adminTokenAccount: adminAta,
-    tokenProgram: TOKEN_PROGRAM_ID,
-  })
-  .rpc();
-```
-
-### Recovery (After Day 35)
-
-```typescript
-// Recover all remaining tokens (entire pool balance — stakes are virtual)
+// Recover all tokens and terminate pool (sets terminated = 1, drains entire balance)
 await program.methods
   .recoverExpiredRewards()
   .accounts({
@@ -378,25 +357,10 @@ await program.methods
   .rpc();
 ```
 
-### Close Pool (After Day 55 or when all users unstaked)
-
-```typescript
-// Close pool — returns all remaining tokens + rent to admin
-await program.methods
-  .closePool()
-  .accounts({
-    admin: adminPubkey,
-    poolState: poolStatePda,
-    poolTokenAccount: poolTokenPda,
-    tokenProgram: TOKEN_PROGRAM_ID,
-  })
-  .rpc();
-```
-
 ## Program ID
 
 ```
-4uxX6uS3V9pyP3ei8NWZzz6RsqSddEhwosSqLD3ZbsVs
+AovZsuC2giiHcTZ7Rn2dz1rd89qB8pPkw1TBZRceQbqq
 ```
 
 ## Error Codes
@@ -406,35 +370,30 @@ await program.methods
 | 6000 | StartTimeInPast | Start time is in the past |
 | 6001 | AirdropPoolExhausted | Airdrop pool (67M) fully claimed |
 | 6002 | PoolTerminated | Pool has been terminated |
-| 6003 | AlreadyTerminated | Pool already terminated |
-| 6004 | PoolNotTerminated | Must terminate before closing |
-| 6005 | PoolNotEmpty | Users must unstake before closing |
-| 6006 | InvalidDailyRewards | Rewards don't sum to STAKING_POOL |
-| 6007 | InvalidDailyRewardsOrder | Daily rewards must be ascending |
-| 6008 | PoolPaused | Pool is paused — operations disabled |
-| 6009 | PoolNotPaused | Pool is not paused |
-| 6010 | AlreadyPaused | Pool is already paused |
-| 6011 | NothingStaked | No staked balance to unstake |
-| 6012 | InvalidStakeOwner | UserStake owner mismatch |
-| 6013 | UnauthorizedAdmin | Signer is not the pool admin |
-| 6014 | Unauthorized | Generic access denied |
-| 6015 | InvalidMerkleProof | Proof doesn't verify |
-| 6016 | InvalidDay | Day out of range |
-| 6017 | SnapshotRequiredFirst | Current day's snapshot missing |
-| 6018 | SnapshotsNotCompleted | Must take all 20 snapshots |
-| 6019 | InvalidPoolTokenAccount | Pool token account mismatch |
-| 6020 | RewardExitWindowNotFinished | Must wait until day 35 |
-| 6021 | NothingToRecover | No tokens to recover |
-| 6022 | PoolNotStartedYet | Pool not started yet |
-| 6023 | StakingPeriodEnded | Staking period ended — no more claims |
+| 6003 | InvalidDailyRewards | Rewards don't sum to STAKING_POOL |
+| 6004 | InvalidDailyRewardsOrder | Daily rewards must be ascending |
+| 6005 | PoolPaused | Pool is paused — operations disabled |
+| 6006 | PoolNotPaused | Pool is not paused |
+| 6007 | AlreadyPaused | Pool is already paused |
+| 6008 | NothingStaked | No staked balance to unstake |
+| 6009 | InvalidStakeOwner | UserStake owner mismatch |
+| 6010 | UnauthorizedAdmin | Signer is not the pool admin |
+| 6011 | Unauthorized | Generic access denied |
+| 6012 | InvalidMerkleProof | Proof doesn't verify |
+| 6013 | InvalidDay | Day out of range |
+| 6014 | SnapshotRequiredFirst | Current day's snapshot missing |
+| 6015 | InvalidPoolTokenAccount | Pool token account mismatch |
+| 6016 | NothingToRecover | No tokens to recover |
+| 6017 | PoolNotStartedYet | Pool not started yet |
+| 6018 | StakingPeriodEnded | Staking period ended — no more claims |
+| 6019 | ClaimWindowStillOpen | Must wait until day 35 to recover |
 
 ## Constants
 
 ```rust
-TOTAL_DAYS = 20                       // Staking period duration
+TOTAL_DAYS = 20                       // Staking/snapshot period (20 days of rewards)
+CLAIM_WINDOW_DAYS = 35                // Claim window — claims, rewards, and admin ops all pivot on day 35
 SECONDS_PER_DAY = 86400               // 24 hours
-REWARD_EXIT_WINDOW_DAYS = 15          // Reward claim grace period (unstake deadline: day 35)
-AIRDROP_EXIT_WINDOW_DAYS = 35         // Pool close grace period (close deadline: day 55)
 AIRDROP_POOL = 67M × 10⁹              // 67M tokens (9 decimals)
 STAKING_POOL = 133M × 10⁹             // 133M tokens (9 decimals)
 ```

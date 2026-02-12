@@ -26,9 +26,8 @@ import { getAccount } from "@solana/spl-token";
 
 // Constants matching the program
 const TOTAL_DAYS = 20;
+const CLAIM_WINDOW_DAYS = 35;
 const SECONDS_PER_DAY = 86400;
-const REWARD_EXIT_WINDOW_DAYS = 15;
-const AIRDROP_EXIT_WINDOW_DAYS = 35;
 const AIRDROP_POOL = BigInt("67000000000000000"); // 67M with 9 decimals
 const STAKING_POOL = BigInt("133000000000000000"); // 133M with 9 decimals
 const TOTAL_POOL = AIRDROP_POOL + STAKING_POOL; // 200M
@@ -238,11 +237,7 @@ async function main() {
   const elapsedSeconds = Math.max(0, now - pool.startTime);
   const currentDay = pool.startTime > now ? 0 : Math.floor(elapsedSeconds / SECONDS_PER_DAY);
   const daysRemaining = Math.max(0, TOTAL_DAYS - currentDay + 1);
-  const rewardExitDay = TOTAL_DAYS + REWARD_EXIT_WINDOW_DAYS;
-  const airdropExitDay = TOTAL_DAYS + AIRDROP_EXIT_WINDOW_DAYS;
-  const isInRewardWindow = currentDay > TOTAL_DAYS && currentDay <= rewardExitDay;
-  const isInAirdropWindow = currentDay > rewardExitDay && currentDay <= airdropExitDay;
-  const isExpired = currentDay > airdropExitDay;
+  const isExpired = currentDay >= CLAIM_WINDOW_DAYS;
 
   // Load merkle data if available
   let merkleData: MerkleJson | null = null;
@@ -385,11 +380,7 @@ async function main() {
       daysRemaining,
       daysElapsed: Math.min(currentDay, TOTAL_DAYS),
       elapsedTime: formatDuration(elapsedSeconds),
-      isInRewardWindow,
-      isInAirdropWindow,
       isExpired,
-      rewardExitDay,
-      airdropExitDay,
     },
     claims: {
       totalEligibleWallets: eligibleWallets,
@@ -494,12 +485,8 @@ async function main() {
   const progressBar = "█".repeat(Math.floor(progressPct / 5)) + "░".repeat(20 - Math.floor(progressPct / 5));
   log(`│  Progress:     [${progressBar}] ${progressPct.toFixed(0)}%`);
 
-  if (isInRewardWindow) {
-    log(`│  ⚠️  IN REWARD EXIT WINDOW (day ${TOTAL_DAYS + 1}-${rewardExitDay}) - Users can still unstake for rewards`);
-  } else if (isInAirdropWindow) {
-    log(`│  ⚠️  REWARD WINDOW EXPIRED - Admin can recover all tokens. Users unstake for 0 rewards.`);
-  } else if (isExpired) {
-    log(`│  ⚠️  ALL WINDOWS EXPIRED - Admin can close pool`);
+  if (isExpired) {
+    log(`│  ⚠️  CLAIM WINDOW EXPIRED (day ${CLAIM_WINDOW_DAYS}+) - Admin can terminate, recover tokens, and close pool`);
   }
   log("└─────────────────────────────────────────────────────────────────┘");
 
