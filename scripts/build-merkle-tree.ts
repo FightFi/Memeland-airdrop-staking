@@ -27,6 +27,7 @@ import { PublicKey } from "@solana/web3.js";
 // ── Config ──────────────────────────────────────────────────────────────────
 
 const TOKEN_DECIMALS = 9;
+const AIRDROP_POOL_RAW = BigInt("67000000000000000"); // 67_000_000 × 10^9
 
 // ── Merkle tree ─────────────────────────────────────────────────────────────
 
@@ -137,12 +138,29 @@ function parseCSV(filePath: string): AllowlistEntry[] {
     }
     seen.add(wallet);
 
-    // Convert human amount to raw (multiply by 10^decimals)
-    const amountFloat = parseFloat(amount);
-    if (isNaN(amountFloat) || amountFloat <= 0) {
-      throw new Error(`Line ${i + 1}: invalid amount "${amount}"`);
+    // Convert human amount to raw using string math (no floating point)
+    const amountParts = amount.split(".");
+    if (amountParts.length > 2) {
+      throw new Error(`Line ${i + 1}: invalid amount format "${amount}"`);
     }
-    const amountRaw = BigInt(Math.round(amountFloat * 10 ** TOKEN_DECIMALS));
+    const intPart = amountParts[0] || "0";
+    const fracPart = amountParts.length === 2 ? amountParts[1] : "";
+    if (fracPart.length > TOKEN_DECIMALS) {
+      throw new Error(
+        `Line ${i + 1}: amount "${amount}" has ${fracPart.length} decimal places (max ${TOKEN_DECIMALS})`
+      );
+    }
+    const paddedFrac = fracPart.padEnd(TOKEN_DECIMALS, "0");
+    const amountRaw = BigInt(intPart) * BigInt(10 ** TOKEN_DECIMALS) + BigInt(paddedFrac);
+
+    if (amountRaw <= 0n) {
+      throw new Error(`Line ${i + 1}: amount must be positive, got "${amount}"`);
+    }
+    if (amountRaw > AIRDROP_POOL_RAW) {
+      throw new Error(
+        `Line ${i + 1}: amount ${amountRaw} exceeds AIRDROP_POOL (${AIRDROP_POOL_RAW})`
+      );
+    }
 
     entries.push({ wallet, amount, amountRaw });
   }
@@ -206,6 +224,21 @@ function main() {
 
     totalAmount += entry.amountRaw;
   }
+
+  // Validate total matches AIRDROP_POOL exactly
+  if (totalAmount !== AIRDROP_POOL_RAW) {
+    const diff = totalAmount - AIRDROP_POOL_RAW;
+    const diffSign = diff > 0n ? "+" : "";
+    const totalStr = totalAmount.toString().padStart(TOKEN_DECIMALS + 1, "0");
+    const totalHuman = `${totalStr.slice(0, totalStr.length - TOKEN_DECIMALS)}.${totalStr.slice(totalStr.length - TOKEN_DECIMALS)}`;
+    console.error(`\nERROR: Total amount mismatch!`);
+    console.error(`  Got:      ${totalHuman} tokens (${totalAmount} raw)`);
+    console.error(`  Expected: 67000000.000000000 tokens (${AIRDROP_POOL_RAW} raw)`);
+    console.error(`  Diff:     ${diffSign}${diff} raw`);
+    process.exit(1);
+  }
+
+  console.log(`Total amount: ${(Number(totalAmount) / 10 ** TOKEN_DECIMALS).toFixed(TOKEN_DECIMALS)} tokens — matches AIRDROP_POOL`);
 
   const output = {
     merkleRoot: Array.from(tree.root),
