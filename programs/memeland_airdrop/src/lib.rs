@@ -7,7 +7,7 @@ declare_id!("AovZsuC2giiHcTZ7Rn2dz1rd89qB8pPkw1TBZRceQbqq");
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 pub const TOTAL_DAYS: u64 = 20;
-pub const CLAIM_WINDOW_DAYS: u64 = 35;
+pub const CLAIM_WINDOW_DAYS: u64 = 40;
 pub const SECONDS_PER_DAY: u64 = 86400;
 
 /// Airdrop pool: 67_000_000 tokens × 10^9 (9 decimals)
@@ -57,7 +57,6 @@ pub mod memeland_airdrop {
         pool.total_staked = AIRDROP_POOL;
         pool.total_airdrop_claimed = 0;
         pool.snapshot_count = 0;
-        pool.terminated = 0;
         pool.paused = 0;
         pool.bump = ctx.bumps.pool_state;
         pool.pool_token_bump = ctx.bumps.pool_token_account;
@@ -103,7 +102,6 @@ pub mod memeland_airdrop {
         let clock = Clock::get()?;
 
         require!(pool.paused == 0, ErrorCode::PoolPaused);
-        require!(pool.terminated == 0, ErrorCode::PoolTerminated);
         require!(
             clock.unix_timestamp > pool.start_time,
             ErrorCode::PoolNotStartedYet
@@ -112,7 +110,7 @@ pub mod memeland_airdrop {
         // Determine which day the user is claiming on
         let current_day = get_current_day(pool.start_time, clock.unix_timestamp);
 
-        // Block claims after the claim window ends (day 35+)
+        // Block claims after the claim window ends (day 40+)
         require!(current_day < CLAIM_WINDOW_DAYS, ErrorCode::StakingPeriodEnded);
 
         // Verify merkle proof
@@ -175,7 +173,6 @@ pub mod memeland_airdrop {
         let clock = Clock::get()?;
 
         require!(pool.paused == 0, ErrorCode::PoolPaused);
-        require!(pool.terminated == 0, ErrorCode::PoolTerminated);
 
         // Must be at least day 1 (snapshot records the previous day's state)
         let raw_day = get_current_day(pool.start_time, clock.unix_timestamp);
@@ -215,7 +212,7 @@ pub mod memeland_airdrop {
     }
 
     /// Unstake: permanent exit. Sends all accumulated rewards.
-    /// After claim window (day 35+), users can still unstake but receive 0 rewards.
+    /// After claim window (day 40+), users can still unstake but receive 0 rewards.
     /// Closes the UserStake account and returns rent to user.
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
         let pool_state_key = ctx.accounts.pool_state.key();
@@ -315,8 +312,7 @@ pub mod memeland_airdrop {
         Ok(())
     }
 
-    /// After claim window (day 35+), admin recovers all remaining tokens and terminates pool.
-    /// Sets terminated = 1 (blocks future claims/snapshots) and drains entire balance.
+    /// After claim window (day 40+), admin recovers all remaining tokens.
     /// Since stakes are virtual (airdrop tokens were sent directly to users on claim),
     /// total_staked represents no real token obligation — the entire balance can be drained.
     /// Can be called again if tokens are sent to the pool after first recovery.
@@ -329,8 +325,6 @@ pub mod memeland_airdrop {
             clock.unix_timestamp >= claim_window_end(pool.start_time),
             ErrorCode::ClaimWindowStillOpen
         );
-
-        pool.terminated = 1;
 
         // Drain entire balance — total_staked is virtual (no real tokens owed)
         let pool_balance = ctx.accounts.pool_token_account.amount;
@@ -347,7 +341,7 @@ pub mod memeland_airdrop {
 
         emit!(TokensRecovered { amount: pool_balance });
 
-        msg!("Pool terminated. {} tokens recovered.", pool_balance);
+        msg!("{} tokens recovered.", pool_balance);
         Ok(())
     }
 
@@ -357,7 +351,6 @@ pub mod memeland_airdrop {
         let pool = &mut ctx.accounts.pool_state;
 
         require!(pool.paused == 0, ErrorCode::AlreadyPaused);
-        require!(pool.terminated == 0, ErrorCode::PoolTerminated);
 
         pool.paused = 1;
 
@@ -374,7 +367,6 @@ pub mod memeland_airdrop {
         let pool = &mut ctx.accounts.pool_state;
 
         require!(pool.paused == 1, ErrorCode::PoolNotPaused);
-        require!(pool.terminated == 0, ErrorCode::PoolTerminated);
 
         pool.paused = 0;
 
@@ -417,7 +409,7 @@ fn transfer_from_pool_pda<'info>(
     token::transfer(transfer_ctx, amount)
 }
 
-/// Returns the unix timestamp when the claim window ends (day 35).
+/// Returns the unix timestamp when the claim window ends (day 40).
 pub fn claim_window_end(start_time: i64) -> i64 {
     start_time + (CLAIM_WINDOW_DAYS as i64 * SECONDS_PER_DAY as i64)
 }
@@ -666,7 +658,6 @@ pub struct PoolState {
     pub total_staked: u64,          // 8
     pub total_airdrop_claimed: u64, // 8
     pub snapshot_count: u8,         // 1
-    pub terminated: u8,             // 1
     pub bump: u8,                   // 1
     pub pool_token_bump: u8,        // 1
     pub paused: u8,                 // 1  (0 = active, 1 = paused)
@@ -745,8 +736,6 @@ pub enum ErrorCode {
     StartTimeInPast,
     #[msg("Airdrop pool exhausted - no more tokens available for claims")]
     AirdropPoolExhausted,
-    #[msg("Pool has been terminated - no new claims allowed")]
-    PoolTerminated,
     #[msg("Daily rewards must sum to exactly STAKING_POOL (133M tokens)")]
     InvalidDailyRewards,
     #[msg("Daily rewards must be in ascending order")]
@@ -790,6 +779,6 @@ pub enum ErrorCode {
     PoolNotStartedYet,
     #[msg("Staking period has ended - claims are no longer accepted")]
     StakingPeriodEnded,
-    #[msg("Claim window still open - cannot terminate until day 35")]
+    #[msg("Claim window still open - cannot recover until day 40")]
     ClaimWindowStillOpen,
 }
