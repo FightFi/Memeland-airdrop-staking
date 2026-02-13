@@ -26,7 +26,7 @@ import { getAccount } from "@solana/spl-token";
 
 // Constants matching the program
 const TOTAL_DAYS = 20;
-const CLAIM_WINDOW_DAYS = 35;
+const CLAIM_WINDOW_DAYS = 40;
 const SECONDS_PER_DAY = 86400;
 const AIRDROP_POOL = BigInt("67000000000000000"); // 67M with 9 decimals
 const STAKING_POOL = BigInt("133000000000000000"); // 133M with 9 decimals
@@ -68,7 +68,6 @@ interface PoolData {
   totalStaked: bigint;
   totalAirdropClaimed: bigint;
   snapshotCount: number;
-  terminated: number;
   paused: number;
   activeStakers: number;
   totalUnstaked: number;
@@ -101,9 +100,6 @@ function parsePoolState(data: Buffer): PoolData {
   offset += 8;
 
   const snapshotCount = data.readUInt8(offset);
-  offset += 1;
-
-  const terminated = data.readUInt8(offset);
   offset += 1;
 
   // bump
@@ -143,7 +139,6 @@ function parsePoolState(data: Buffer): PoolData {
     totalStaked,
     totalAirdropClaimed,
     snapshotCount,
-    terminated,
     paused,
     activeStakers,
     totalUnstaked,
@@ -368,9 +363,8 @@ async function main() {
       address: poolState.toBase58(),
       admin: pool.admin.toBase58(),
       tokenMint: pool.tokenMint.toBase58(),
-      status: pool.terminated === 1 ? "TERMINATED" : pool.paused === 1 ? "PAUSED" : "ACTIVE",
+      status: pool.paused === 1 ? "PAUSED" : "ACTIVE",
       paused: pool.paused === 1,
-      terminated: pool.terminated === 1,
     },
     time: {
       startTime: pool.startTime,
@@ -463,8 +457,8 @@ async function main() {
   log("═".repeat(70));
 
   // Status Banner
-  const statusEmoji = pool.terminated === 1 ? "⛔" : pool.paused === 1 ? "🔴" : "🟢";
-  const statusText = pool.terminated === 1 ? "TERMINATED" : pool.paused === 1 ? "PAUSED" : "ACTIVE";
+  const statusEmoji = pool.paused === 1 ? "🔴" : "🟢";
+  const statusText = pool.paused === 1 ? "PAUSED" : "ACTIVE";
   log(`\n   Status: ${statusEmoji} ${statusText}          Network: ${networkName}`);
 
   // Pool Info

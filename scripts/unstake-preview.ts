@@ -19,7 +19,7 @@ import { getAccount } from "@solana/spl-token";
 
 const SECONDS_PER_DAY = 86400;
 const TOTAL_DAYS = 20;
-const CLAIM_WINDOW_DAYS = 35;
+const CLAIM_WINDOW_DAYS = 40;
 const AIRDROP_POOL = BigInt("67000000000000000"); // 67M with 9 decimals
 const STAKING_POOL = BigInt("133000000000000000"); // 133M with 9 decimals
 const TOTAL_POOL = AIRDROP_POOL + STAKING_POOL;
@@ -54,7 +54,6 @@ interface PoolData {
   totalStaked: bigint;
   totalAirdropClaimed: bigint;
   snapshotCount: number;
-  terminated: number;
   paused: number;
   dailyRewards: bigint[];
   dailySnapshots: bigint[];
@@ -70,7 +69,6 @@ function parsePoolState(data: Buffer): PoolData {
   const totalStaked = data.readBigUInt64LE(offset); offset += 8;
   const totalAirdropClaimed = data.readBigUInt64LE(offset); offset += 8;
   const snapshotCount = data.readUInt8(offset); offset += 1;
-  const terminated = data.readUInt8(offset); offset += 1;
   offset += 1; // bump
   offset += 1; // pool_token_bump
   const paused = data.readUInt8(offset); offset += 1;
@@ -90,7 +88,7 @@ function parsePoolState(data: Buffer): PoolData {
 
   return {
     admin, tokenMint, poolTokenAccount, merkleRoot, startTime,
-    totalStaked, totalAirdropClaimed, snapshotCount, terminated, paused,
+    totalStaked, totalAirdropClaimed, snapshotCount, paused,
     dailyRewards, dailySnapshots,
   };
 }
@@ -210,7 +208,7 @@ async function main() {
   // ═══════════════════════════════════════════════════════════════
   // POOL GENERAL INFO
   // ═══════════════════════════════════════════════════════════════
-  const statusText = pool.terminated === 1 ? "TERMINATED" : pool.paused === 1 ? "PAUSED" : "ACTIVE";
+  const statusText = pool.paused === 1 ? "PAUSED" : "ACTIVE";
   const networkName = rpcUrl.includes("devnet") ? "DEVNET" : rpcUrl.includes("mainnet") ? "MAINNET" : "CUSTOM";
 
   console.log();
@@ -345,7 +343,7 @@ async function main() {
   console.log("\n-- REWARD BREAKDOWN (if unstake today) -----------------------------");
 
   if (isRewardExpired) {
-    console.log("\n  ** REWARD WINDOW EXPIRED (day > 35) - Rewards = 0 **");
+    console.log("\n  ** REWARD WINDOW EXPIRED (day > 40) - Rewards = 0 **");
     console.log(`  Unstaking will return 0 rewards (closes account, recovers ~0.002 SOL rent).`);
     console.log(`  Your airdrop tokens were already sent to your wallet on claim.`);
     console.log("\n" + "=".repeat(72) + "\n");

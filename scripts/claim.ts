@@ -79,7 +79,6 @@ interface PoolData {
   totalStaked: bigint;
   totalAirdropClaimed: bigint;
   snapshotCount: number;
-  terminated: number;
   paused: number;
 }
 
@@ -88,10 +87,10 @@ function parsePoolState(data: Buffer): PoolData {
   const totalStaked = data.readBigUInt64LE(8 + 32 + 32 + 32 + 32 + 8);
   const totalAirdropClaimed = data.readBigUInt64LE(8 + 32 + 32 + 32 + 32 + 8 + 8);
   const snapshotCount = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8);
-  const terminated = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 1);
-  const paused = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 1 + 1 + 1 + 1);
+  // skip bump (1) + pool_token_bump (1)
+  const paused = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 1 + 1 + 1);
 
-  return { startTime, totalStaked, totalAirdropClaimed, snapshotCount, terminated, paused };
+  return { startTime, totalStaked, totalAirdropClaimed, snapshotCount, paused };
 }
 
 async function main() {
@@ -195,7 +194,6 @@ async function main() {
   const pool = parsePoolState(poolAccount.data);
   console.log(`\n   Pool Status:`);
   console.log(`   - Paused:     ${pool.paused === 1 ? "YES ⚠️" : "NO"}`);
-  console.log(`   - Terminated: ${pool.terminated === 1 ? "YES ⚠️" : "NO"}`);
   console.log(`   - Total Claimed: ${Number(pool.totalAirdropClaimed) / 1e9} tokens`);
 
   // Check if already claimed
@@ -224,11 +222,6 @@ async function main() {
   // Verify we can claim
   if (pool.paused === 1) {
     console.error("\n❌ Pool is PAUSED. Cannot claim.");
-    process.exit(1);
-  }
-
-  if (pool.terminated === 1) {
-    console.error("\n❌ Pool is TERMINATED. Cannot claim.");
     process.exit(1);
   }
 
@@ -296,14 +289,12 @@ async function main() {
     console.log(`   TX: ${tx}`);
     console.log(`   Amount: ${claimData.amount} tokens`);
     console.log(`\n   Tokens sent to your wallet. Earning staking rewards from day 0.`);
-    console.log(`   Call unstake() before day 35 to collect rewards.`);
+    console.log(`   Call unstake() before day 40 to collect rewards.`);
   } catch (err: any) {
     const errMsg = err.message || String(err);
 
     if (errMsg.includes("PoolPaused")) {
       console.error("\n❌ Failed: Pool is paused.");
-    } else if (errMsg.includes("PoolTerminated")) {
-      console.error("\n❌ Failed: Pool is terminated.");
     } else if (errMsg.includes("InvalidMerkleProof")) {
       console.error("\n❌ Failed: Invalid merkle proof.");
     } else if (errMsg.includes("AirdropPoolExhausted")) {

@@ -67,7 +67,6 @@ interface PoolData {
   startTime: number;
   totalStaked: bigint;
   snapshotCount: number;
-  terminated: number;
   paused: number;
 }
 
@@ -76,10 +75,10 @@ function parsePoolState(data: Buffer): PoolData {
   const startTime = Number(data.readBigInt64LE(8 + 32 + 32 + 32 + 32));
   const totalStaked = data.readBigUInt64LE(8 + 32 + 32 + 32 + 32 + 8);
   const snapshotCount = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8);
-  const terminated = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 1);
-  const paused = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 1 + 1 + 1 + 1);
+  // skip bump (1) + pool_token_bump (1)
+  const paused = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 1 + 1 + 1);
 
-  return { admin, startTime, totalStaked, snapshotCount, terminated, paused };
+  return { admin, startTime, totalStaked, snapshotCount, paused };
 }
 
 async function askConfirmation(question: string): Promise<boolean> {
@@ -143,7 +142,6 @@ async function main() {
   console.log("=".repeat(60));
   console.log(`Current Status:`);
   console.log(`   Paused:      ${pool.paused === 1 ? "YES 🔴" : "NO 🟢"}`);
-  console.log(`   Terminated:  ${pool.terminated === 1 ? "YES" : "NO"}`);
   console.log("=".repeat(60));
 
   // Check if caller is admin
@@ -166,12 +164,6 @@ async function main() {
       console.log("   - All operations are available");
     }
     process.exit(0);
-  }
-
-  // Check if pool is terminated
-  if (pool.terminated === 1) {
-    console.error("\n❌ Pool is TERMINATED. Cannot pause/unpause.");
-    process.exit(1);
   }
 
   // Validate action
@@ -256,8 +248,6 @@ async function main() {
       console.error("\n❌ Failed: Pool is already paused.");
     } else if (errMsg.includes("PoolNotPaused")) {
       console.error("\n❌ Failed: Pool is not paused.");
-    } else if (errMsg.includes("PoolTerminated")) {
-      console.error("\n❌ Failed: Pool is terminated.");
     } else if (errMsg.includes("UnauthorizedAdmin")) {
       console.error("\n❌ Failed: You are not the pool admin.");
     } else {

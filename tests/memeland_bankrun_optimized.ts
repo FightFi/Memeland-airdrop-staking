@@ -26,7 +26,7 @@ const { keccak256 } = pkg;
 
 // Constants from lib.rs
 const TOTAL_DAYS = 20;
-const CLAIM_WINDOW_DAYS = 35;
+const CLAIM_WINDOW_DAYS = 40;
 const SECONDS_PER_DAY = 86400;
 const STAKING_POOL = new BN("133000000000000000"); // 133M tokens
 const AIRDROP_POOL = new BN("67000000000000000");  // 67M tokens
@@ -251,7 +251,6 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
       .rpc();
 
     const state = await program.account.poolState.fetch(poolStatePda);
-    expect(state.terminated).to.equal(0);
     expect(state.startTime.toNumber()).to.equal(startTime);
   });
 
@@ -383,9 +382,8 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
       .signers([admin])
       .rpc();
 
-    // Verify pool is terminated
+    // Verify recovery succeeded
     const poolAccount = await program.account.poolState.fetch(poolStatePda);
-    expect(poolAccount.terminated).to.equal(1);
   });
 
   it("Pause/Unpause Coverage", async () => {
@@ -863,8 +861,8 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
     });
 
     it("Token Recovery: Admin recovers expired funds", async () => {
-        // Warp past claim window (day 35+)
-        await warpTo(poolStart + 36 * SECONDS_PER_DAY);
+        // Warp past claim window (day 40+)
+        await warpTo(poolStart + (CLAIM_WINDOW_DAYS + 1) * SECONDS_PER_DAY);
         const adminAta = await getOrCreateATABankrun(rPool, admin.publicKey);
         const poolAtaBefore = await getAccountBankrun(rPoolToken);
         const adminAtaBefore = await getAccountBankrun(adminAta);
@@ -981,7 +979,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
             .signers([tUser])
             .rpc();
 
-        // Warp past claim window (day 35+) and terminate
+        // Warp past claim window (day 40+) and terminate
         await warpTo(poolStart + CLAIM_WINDOW_DAYS * SECONDS_PER_DAY + 1);
 
         const adminAta = await getOrCreateATABankrun(tPool, admin.publicKey);
@@ -1271,8 +1269,8 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
                 await warpTo(Number(currentClock.unixTimestamp) + 1);
             }
 
-            // Warp to Day 36 (past claim window) — unstake gives 0 rewards
-            await warpTo(xStart + 36 * SECONDS_PER_DAY);
+            // Warp past claim window — unstake gives 0 rewards
+            await warpTo(xStart + (CLAIM_WINDOW_DAYS + 1) * SECONDS_PER_DAY);
             await program.methods.unstake()
                 .accounts({ user: xUser.publicKey, poolState: xState, userStake: xStake, poolTokenAccount: xToken, userTokenAccount: xUserAta, tokenProgram: TOKEN_PROGRAM_ID })
                 .signers([xUser]).rpc();
@@ -1409,7 +1407,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
     });
 
     it("UnauthorizedAdmin: non-admin cannot recover", async () => {
-      await warpTo(reStart + 36 * SECONDS_PER_DAY);
+      await warpTo(reStart + (CLAIM_WINDOW_DAYS + 1) * SECONDS_PER_DAY);
       const aliceAta = await getOrCreateATABankrun(rePool, alice.publicKey, alice);
 
       try {
@@ -1453,7 +1451,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
 
     it("NothingToRecover: recover after all tokens drained", async () => {
       // Warp past claim window
-      await warpTo(reStart + 36 * SECONDS_PER_DAY);
+      await warpTo(reStart + (CLAIM_WINDOW_DAYS + 1) * SECONDS_PER_DAY);
       const adminAta = await getOrCreateATABankrun(rePool, admin.publicKey);
 
       // First recovery should succeed
@@ -1520,7 +1518,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
       ), [admin]);
     });
 
-    it("ClaimWindowStillOpen: terminate before day 35", async () => {
+    it("ClaimWindowStillOpen: recover before day 40", async () => {
       // Still within claim window, so terminate should fail
       await warpTo(tpStart + 21 * SECONDS_PER_DAY);
       const adminAta = await getOrCreateATABankrun(tpPool, admin.publicKey);
@@ -1541,11 +1539,11 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
     });
 
     it("NothingToRecover: recover twice drains on first, fails on second", async () => {
-      // Warp past claim window (day 35+)
+      // Warp past claim window (day 40+)
       await warpTo(tpStart + CLAIM_WINDOW_DAYS * SECONDS_PER_DAY + 1);
 
       const adminAta = await getOrCreateATABankrun(tpPool, admin.publicKey);
-      // First call should succeed (drains everything, sets terminated = 1)
+      // First call should succeed (drains everything)
       await program.methods.recoverExpiredRewards()
         .accounts({
           admin: admin.publicKey,
@@ -1647,135 +1645,6 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
     });
   });
 
-  describe("PoolTerminated guards", () => {
-    let ptPool: PublicKey;
-    let ptPoolState: PublicKey;
-    let ptPoolToken: PublicKey;
-    let ptMerkleLayers: any;
-    let ptMerkleRoot: Buffer;
-    let ptStart: number;
-
-    const ptUser = Keypair.generate();
-    const ptAmount = new BN(1_000_000).mul(new BN(1e9));
-
-    before(async () => {
-      ptPool = await createMintBankrun(TOKEN_DECIMALS, admin.publicKey);
-      [ptPoolState] = getPoolStatePda(ptPool);
-      [ptPoolToken] = getPoolTokenPda(ptPoolState);
-
-      ptMerkleLayers = buildMerkleTree([
-        computeLeaf(ptUser.publicKey, ptAmount),
-        computeLeaf(alice.publicKey, aliceAmount),
-      ]);
-      ptMerkleRoot = getMerkleRoot(ptMerkleLayers);
-
-      await fundAccount(ptUser.publicKey);
-      ptStart = Math.floor(Date.now() / 1000) + 1000;
-      await warpTo(ptStart - 100);
-
-      await program.methods.initializePool(new BN(ptStart), Array.from(ptMerkleRoot), computeDailyRewards())
-        .accounts({
-          admin: admin.publicKey,
-          poolState: ptPoolState,
-          tokenMint: ptPool,
-          poolTokenAccount: ptPoolToken,
-          systemProgram: SystemProgram.programId,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          rent: SYSVAR_RENT_PUBKEY,
-        }).signers([admin]).rpc();
-
-      const adminAta = await getOrCreateATABankrun(ptPool, admin.publicKey);
-      await provider.sendAndConfirm(new anchor.web3.Transaction().add(
-        createMintToInstruction(ptPool, adminAta, admin.publicKey, BigInt(TOTAL_POOL.toString())),
-        createTransferInstruction(adminAta, ptPoolToken, admin.publicKey, BigInt(TOTAL_POOL.toString()))
-      ), [admin]);
-
-      // Claim with ptUser on Day 1, complete all snapshots, then terminate
-      await warpTo(ptStart + SECONDS_PER_DAY + 3600);
-      await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: ptPoolState }).signers([admin]).rpc();
-
-      const [ptStake] = getUserStakePda(ptPoolState, ptUser.publicKey);
-      const [ptMarker] = getClaimMarkerPda(ptPoolState, ptUser.publicKey);
-      const ptUserAta = await getOrCreateATABankrun(ptPool, ptUser.publicKey, ptUser);
-      await program.methods.claimAirdrop(ptAmount, getMerkleProof(ptMerkleLayers, computeLeaf(ptUser.publicKey, ptAmount)))
-        .accounts({ user: ptUser.publicKey, poolState: ptPoolState, claimMarker: ptMarker, userStake: ptStake, poolTokenAccount: ptPoolToken, userTokenAccount: ptUserAta, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID })
-        .signers([ptUser]).rpc();
-
-      // Complete all 20 snapshots
-      await warpTo(ptStart + 21 * SECONDS_PER_DAY);
-      for (let i = 0; i < 20; i++) {
-        try { await program.methods.snapshot().accounts({ signer: admin.publicKey, poolState: ptPoolState }).signers([admin]).rpc(); } catch (e) {}
-        const clock = await context.banksClient.getClock();
-        await warpTo(Number(clock.unixTimestamp) + 1);
-      }
-
-      // Warp past claim window and terminate
-      await warpTo(ptStart + CLAIM_WINDOW_DAYS * SECONDS_PER_DAY + 1);
-      const adminAta2 = await getOrCreateATABankrun(ptPool, admin.publicKey);
-      await program.methods.recoverExpiredRewards()
-        .accounts({
-          admin: admin.publicKey,
-          poolState: ptPoolState,
-          poolTokenAccount: ptPoolToken,
-          adminTokenAccount: adminAta2,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        }).signers([admin]).rpc();
-    });
-
-    it("claim_airdrop on terminated pool fails with PoolTerminated", async () => {
-      const [aStake] = getUserStakePda(ptPoolState, alice.publicKey);
-      const [aMarker] = getClaimMarkerPda(ptPoolState, alice.publicKey);
-      const aliceAtaPt = await getOrCreateATABankrun(ptPool, alice.publicKey, alice);
-
-      try {
-        await program.methods.claimAirdrop(aliceAmount, getMerkleProof(ptMerkleLayers, computeLeaf(alice.publicKey, aliceAmount)))
-          .accounts({ user: alice.publicKey, poolState: ptPoolState, claimMarker: aMarker, userStake: aStake, poolTokenAccount: ptPoolToken, userTokenAccount: aliceAtaPt, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID })
-          .signers([alice]).rpc();
-        expect.fail("Should have failed with PoolTerminated");
-      } catch (e: any) {
-        const msg = (e.message || "").toString();
-        expect(msg).to.satisfy((m: string) => m.includes("PoolTerminated") || m.includes("6002") || m.includes("0x1772"));
-      }
-    });
-
-    it("snapshot on terminated pool fails with PoolTerminated", async () => {
-      try {
-        await program.methods.snapshot()
-          .accounts({ signer: admin.publicKey, poolState: ptPoolState })
-          .signers([admin]).rpc();
-        expect.fail("Should have failed with PoolTerminated");
-      } catch (e: any) {
-        const msg = (e.message || "").toString();
-        expect(msg).to.satisfy((m: string) => m.includes("PoolTerminated") || m.includes("6002") || m.includes("0x1772"));
-      }
-    });
-
-    it("pause on terminated pool fails with PoolTerminated", async () => {
-      try {
-        await program.methods.pausePool()
-          .accounts({ admin: admin.publicKey, poolState: ptPoolState })
-          .signers([admin]).rpc();
-        expect.fail("Should have failed with PoolTerminated");
-      } catch (e: any) {
-        const msg = (e.message || "").toString();
-        expect(msg).to.satisfy((m: string) => m.includes("PoolTerminated") || m.includes("6002") || m.includes("0x1772"));
-      }
-    });
-
-    it("unpause on terminated pool fails with PoolTerminated", async () => {
-      try {
-        await program.methods.unpausePool()
-          .accounts({ admin: admin.publicKey, poolState: ptPoolState })
-          .signers([admin]).rpc();
-        expect.fail("Should have failed with PoolTerminated");
-      } catch (e: any) {
-        const msg = (e.message || "").toString();
-        // unpause checks paused==1 first, but pool is not paused, so it hits PoolNotPaused before PoolTerminated
-        // Both are valid rejections for an invalid operation on a terminated pool
-        expect(msg).to.satisfy((m: string) => m.includes("PoolTerminated") || m.includes("PoolNotPaused") || m.includes("6002") || m.includes("6006"));
-      }
-    });
-  });
 
   describe("SnapshotRequiredFirst guards", () => {
     let srPool: PublicKey;

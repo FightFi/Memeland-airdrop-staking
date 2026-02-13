@@ -37,7 +37,6 @@ interface PoolData {
   totalStaked: bigint;
   totalAirdropClaimed: bigint;
   snapshotCount: number;
-  terminated: number;
   paused: number;
   dailyRewards: bigint[];
   dailySnapshots: bigint[];
@@ -68,9 +67,6 @@ function parsePoolState(data: Buffer): PoolData {
   offset += 8;
 
   const snapshotCount = data.readUInt8(offset);
-  offset += 1;
-
-  const terminated = data.readUInt8(offset);
   offset += 1;
 
   // bump
@@ -110,7 +106,6 @@ function parsePoolState(data: Buffer): PoolData {
     totalStaked,
     totalAirdropClaimed,
     snapshotCount,
-    terminated,
     paused,
     dailyRewards,
     dailySnapshots,

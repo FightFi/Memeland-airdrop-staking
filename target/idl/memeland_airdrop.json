@@ -357,8 +357,7 @@
     {
       "name": "recover_expired_rewards",
       "docs": [
-        "After claim window (day 35+), admin recovers all remaining tokens and terminates pool.",
-        "Sets terminated = 1 (blocks future claims/snapshots) and drains entire balance.",
+        "After claim window (day 40+), admin recovers all remaining tokens.",
         "Since stakes are virtual (airdrop tokens were sent directly to users on claim),",
         "total_staked represents no real token obligation — the entire balance can be drained.",
         "Can be called again if tokens are sent to the pool after first recovery."
@@ -469,7 +468,7 @@
       "name": "unstake",
       "docs": [
         "Unstake: permanent exit. Sends all accumulated rewards.",
-        "After claim window (day 35+), users can still unstake but receive 0 rewards.",
+        "After claim window (day 40+), users can still unstake but receive 0 rewards.",
         "Closes the UserStake account and returns rent to user."
       ],
       "discriminator": [
@@ -695,93 +694,88 @@
     },
     {
       "code": 6002,
-      "name": "PoolTerminated",
-      "msg": "Pool has been terminated - no new claims allowed"
-    },
-    {
-      "code": 6003,
       "name": "InvalidDailyRewards",
       "msg": "Daily rewards must sum to exactly STAKING_POOL (133M tokens)"
     },
     {
-      "code": 6004,
+      "code": 6003,
       "name": "InvalidDailyRewardsOrder",
       "msg": "Daily rewards must be in ascending order"
     },
     {
-      "code": 6005,
+      "code": 6004,
       "name": "PoolPaused",
       "msg": "Pool is paused - operations temporarily disabled"
     },
     {
-      "code": 6006,
+      "code": 6005,
       "name": "PoolNotPaused",
       "msg": "Pool is not paused - cannot unpause"
     },
     {
-      "code": 6007,
+      "code": 6006,
       "name": "AlreadyPaused",
       "msg": "Pool is already paused"
     },
     {
-      "code": 6008,
+      "code": 6007,
       "name": "NothingStaked",
       "msg": "Nothing staked - user has no active stake"
     },
     {
-      "code": 6009,
+      "code": 6008,
       "name": "InvalidStakeOwner",
       "msg": "User does not own this stake account"
     },
     {
-      "code": 6010,
+      "code": 6009,
       "name": "UnauthorizedAdmin",
       "msg": "Unauthorized - caller is not the pool admin"
     },
     {
-      "code": 6011,
+      "code": 6010,
       "name": "Unauthorized",
       "msg": "Unauthorized - generic access denied"
     },
     {
-      "code": 6012,
+      "code": 6011,
       "name": "InvalidMerkleProof",
       "msg": "Invalid merkle proof - verification failed"
     },
     {
-      "code": 6013,
+      "code": 6012,
       "name": "InvalidDay",
       "msg": "Invalid day for this operation"
     },
     {
-      "code": 6014,
+      "code": 6013,
       "name": "SnapshotRequiredFirst",
       "msg": "Previous day's snapshot must be taken before claims/unstakes"
     },
     {
-      "code": 6015,
+      "code": 6014,
       "name": "InvalidPoolTokenAccount",
       "msg": "Invalid pool token account - does not match pool state"
     },
     {
-      "code": 6016,
+      "code": 6015,
       "name": "NothingToRecover",
       "msg": "No tokens to recover - pool balance equals staked amount"
     },
     {
-      "code": 6017,
+      "code": 6016,
       "name": "PoolNotStartedYet",
       "msg": "Pool not started yet - must wait until start time"
     },
     {
-      "code": 6018,
+      "code": 6017,
       "name": "StakingPeriodEnded",
       "msg": "Staking period has ended - claims are no longer accepted"
     },
     {
-      "code": 6019,
+      "code": 6018,
       "name": "ClaimWindowStillOpen",
-      "msg": "Claim window still open - cannot terminate until day 35"
+      "msg": "Claim window still open - cannot recover until day 40"
     }
   ],
   "types": [
@@ -896,10 +890,6 @@
           },
           {
             "name": "snapshot_count",
-            "type": "u8"
-          },
-          {
-            "name": "terminated",
             "type": "u8"
           },
           {
