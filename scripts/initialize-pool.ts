@@ -25,6 +25,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { spawnSync } from "child_process";
 import {
   Connection,
   Keypair,
@@ -109,13 +110,46 @@ async function main() {
   console.log(`IDL Address: ${idl.address}`);
   const program = new Program(idl, provider);
 
-  // Load merkle root
+  // Load or build merkle tree
   const resolvedMerklePath = path.resolve(merkleJsonPath);
+  const projectRoot = path.resolve(__dirname, "..");
+  const tsNodeBin = path.join(projectRoot, "node_modules", ".bin", "ts-node");
+  const tsNodeArgs = ["--compiler-options", '{"types":["node","mocha","chai"],"lib":["es2020"]}'];
+
   if (!fs.existsSync(resolvedMerklePath)) {
-    console.error(`Merkle JSON not found: ${resolvedMerklePath}`);
-    console.error("Run: yarn build-merkle data/allowlist.csv");
+    // Try to find the source CSV and build the merkle tree
+    const csvPath = resolvedMerklePath.replace(/-merkle\.json$/i, ".csv");
+    if (!fs.existsSync(csvPath)) {
+      console.error(`Merkle JSON not found: ${resolvedMerklePath}`);
+      console.error(`Source CSV not found either: ${csvPath}`);
+      console.error("Provide the merkle JSON or the source CSV.");
+      process.exit(1);
+    }
+
+    console.log(`\nMerkle JSON not found. Building from CSV: ${csvPath}`);
+    const buildScript = path.join(__dirname, "build-merkle-tree.ts");
+    const buildResult = spawnSync(tsNodeBin, [...tsNodeArgs, buildScript, csvPath, resolvedMerklePath], {
+      stdio: "inherit",
+      cwd: projectRoot,
+    });
+    if (buildResult.status !== 0) {
+      console.error("\nFailed to build merkle tree. Fix the CSV and try again.");
+      process.exit(1);
+    }
+  }
+
+  // Validate merkle tree
+  console.log("\n--- Validating Merkle Tree ---");
+  const validateScript = path.join(__dirname, "validate-allowlist.ts");
+  const validateResult = spawnSync(tsNodeBin, [...tsNodeArgs, validateScript, resolvedMerklePath], {
+    stdio: "inherit",
+    cwd: projectRoot,
+  });
+  if (validateResult.status !== 0) {
+    console.error("\nMerkle tree validation failed! Fix the issues above before initializing.");
     process.exit(1);
   }
+
   const merkleData = JSON.parse(fs.readFileSync(resolvedMerklePath, "utf-8"));
   const merkleRoot: number[] = merkleData.merkleRoot;
   console.log(`Merkle root: [${merkleRoot.slice(0, 4).join(", ")}...]`);
