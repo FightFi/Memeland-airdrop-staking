@@ -39,7 +39,7 @@ solana config set --url $CLUSTER
 
 # ----- ANCHOR DEPLOY -----
 echo "🚀 Deploying Anchor program..."
-ANCHOR_WALLET=$KEYPAIR anchor deploy --program-name memeland_airdrop --provider.cluster $CLUSTER --provider.wallet $KEYPAIR --program-keypair $PROGRAM_KEYPAIR
+ADMIN_KEYPAIR=$KEYPAIR anchor deploy --program-name memeland_airdrop --provider.cluster $CLUSTER --provider.wallet $KEYPAIR --program-keypair $PROGRAM_KEYPAIR
 
 # ----- FINAL INFO -----
 PROGRAM_ID=$(anchor keys list | grep "Program Id:" | awk '{print $3}')
