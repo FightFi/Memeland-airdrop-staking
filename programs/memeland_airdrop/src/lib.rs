@@ -16,8 +16,7 @@ pub const AIRDROP_POOL: u64 = 67_000_000_000_000_000;
 /// Staking rewards pool: 133_000_000 tokens × 10^9
 pub const STAKING_POOL: u64 = 133_000_000_000_000_000;
 
-/// TODO: Replace with actual admin pubkey before deployment
-pub const INIT_AUTHORITY: Pubkey = pubkey!("CpPPfLTUzytRXBrUUjb84EkYtA84CsoeVefhaJ2cyPg3");
+pub const INIT_AUTHORITY: Pubkey = pubkey!("65mxnibS4DL2qqL24GpMJqtNxgEzWgnARTMvXv5SePUb");
 
 // ── Seeds ──────────────────────────────────────────────────────────────────────
 
