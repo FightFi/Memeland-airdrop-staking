@@ -236,7 +236,7 @@ memeland-airdrop/
 | Variable | Description |
 |----------|-------------|
 | `ANCHOR_PROVIDER_URL` | Solana RPC endpoint |
-| `ANCHOR_WALLET` | Path to admin keypair JSON |
+| `ADMIN_KEYPAIR` | Path to admin keypair JSON |
 | `PROGRAM_ID` | Deployed program address |
 | `TOKEN_MINT` | $FIGHT token mint address |
 | `MERKLE_JSON` | Path to merkle tree JSON |
@@ -360,7 +360,7 @@ await program.methods
 ## Program ID
 
 ```
-CoRoXM3uPR9Mm9ES8nggW2KGnfJdGBJHh49uq7As8gaq
+4b5hf3QWxaLm8Nni7YQvpjDWyjXRHmmMQyeYBf5wd6Xz
 ```
 
 ## Error Codes
