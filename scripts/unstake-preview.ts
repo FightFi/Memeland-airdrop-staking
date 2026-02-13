@@ -19,7 +19,7 @@ import { getAccount } from "@solana/spl-token";
 
 const SECONDS_PER_DAY = 86400;
 const TOTAL_DAYS = 20;
-const REWARD_EXIT_WINDOW_DAYS = 15;
+const CLAIM_WINDOW_DAYS = 40;
 const AIRDROP_POOL = BigInt("67000000000000000"); // 67M with 9 decimals
 const STAKING_POOL = BigInt("133000000000000000"); // 133M with 9 decimals
 const TOTAL_POOL = AIRDROP_POOL + STAKING_POOL;
@@ -35,14 +35,8 @@ function requireEnv(name: string): string {
 }
 
 /**
- * Must match on-chain get_current_day (lib.rs:507-518).
- *
- *   if now <= start_time -> 0
- *   day = elapsed / SECONDS_PER_DAY
- *   if day >= TOTAL_DAYS -> TOTAL_DAYS
- *   else -> day
- *
- * Returns 0-indexed day. Day 0 = first 24h, day 1 = second 24h, etc.
+ * Must match on-chain get_current_day.
+ * Returns 0-indexed day capped at TOTAL_DAYS.
  */
 function getOnChainDay(startTime: number, now: number): number {
   if (now <= startTime) return 0;
@@ -60,7 +54,6 @@ interface PoolData {
   totalStaked: bigint;
   totalAirdropClaimed: bigint;
   snapshotCount: number;
-  terminated: number;
   paused: number;
   dailyRewards: bigint[];
   dailySnapshots: bigint[];
@@ -76,7 +69,6 @@ function parsePoolState(data: Buffer): PoolData {
   const totalStaked = data.readBigUInt64LE(offset); offset += 8;
   const totalAirdropClaimed = data.readBigUInt64LE(offset); offset += 8;
   const snapshotCount = data.readUInt8(offset); offset += 1;
-  const terminated = data.readUInt8(offset); offset += 1;
   offset += 1; // bump
   offset += 1; // pool_token_bump
   const paused = data.readUInt8(offset); offset += 1;
@@ -96,7 +88,7 @@ function parsePoolState(data: Buffer): PoolData {
 
   return {
     admin, tokenMint, poolTokenAccount, merkleRoot, startTime,
-    totalStaked, totalAirdropClaimed, snapshotCount, terminated, paused,
+    totalStaked, totalAirdropClaimed, snapshotCount, paused,
     dailyRewards, dailySnapshots,
   };
 }
@@ -132,7 +124,7 @@ function formatDuration(seconds: number): string {
 }
 
 /**
- * Replicates on-chain calculate_user_rewards (new_lib.rs).
+ * Replicates on-chain calculate_user_rewards.
  * All users earn from day 0.
  */
 function calculateUserRewards(
@@ -197,13 +189,13 @@ async function main() {
   }
   const pool = parsePoolState(poolAccount.data);
 
-  // Time calculations — uses on-chain day (0-indexed, matching lib.rs:507-518)
+  // Time calculations — uses on-chain day (0-indexed, matching get_current_day)
   const now = Math.floor(Date.now() / 1000);
   const elapsed = Math.max(0, now - pool.startTime);
   const onChainDay = getOnChainDay(pool.startTime, now);
   const displayDay = onChainDay + 1; // 1-indexed for humans
-  const isRewardExpired = onChainDay > TOTAL_DAYS + REWARD_EXIT_WINDOW_DAYS;
-  const isInExitWindow = onChainDay > TOTAL_DAYS && !isRewardExpired;
+  const isRewardExpired = onChainDay >= CLAIM_WINDOW_DAYS;
+  const isInClaimWindow = onChainDay > TOTAL_DAYS && !isRewardExpired;
   const daysRemaining = Math.max(0, TOTAL_DAYS - onChainDay);
 
   // Pool token balance
@@ -216,7 +208,7 @@ async function main() {
   // ═══════════════════════════════════════════════════════════════
   // POOL GENERAL INFO
   // ═══════════════════════════════════════════════════════════════
-  const statusText = pool.terminated === 1 ? "TERMINATED" : pool.paused === 1 ? "PAUSED" : "ACTIVE";
+  const statusText = pool.paused === 1 ? "PAUSED" : "ACTIVE";
   const networkName = rpcUrl.includes("devnet") ? "DEVNET" : rpcUrl.includes("mainnet") ? "MAINNET" : "CUSTOM";
 
   console.log();
@@ -232,7 +224,7 @@ async function main() {
   console.log(`  Token Mint:         ${pool.tokenMint.toBase58()}`);
   console.log(`  Start Time:         ${new Date(pool.startTime * 1000).toUTCString()}`);
   console.log(`  Elapsed:            ${formatDuration(elapsed)}`);
-  console.log(`  Current Day:        ${onChainDay} on-chain / day ${displayDay} for users  (${daysRemaining > 0 ? daysRemaining + " days left" : isInExitWindow ? "IN EXIT WINDOW" : "EXPIRED"})`);
+  console.log(`  Current Day:        ${onChainDay} on-chain / day ${displayDay} for users  (${daysRemaining > 0 ? daysRemaining + " days left" : isInClaimWindow ? "IN CLAIM WINDOW" : "EXPIRED"})`);
   console.log(`  Total Staked:       ${fmt(pool.totalStaked)} tokens`);
   console.log(`  Airdrop Claimed:    ${fmt(pool.totalAirdropClaimed)} / ${fmt(AIRDROP_POOL)} (${pct(pool.totalAirdropClaimed, AIRDROP_POOL)})`);
   console.log(`  Pool Token Balance: ${fmt(poolTokenBalance)} tokens`);
@@ -351,7 +343,7 @@ async function main() {
   console.log("\n-- REWARD BREAKDOWN (if unstake today) -----------------------------");
 
   if (isRewardExpired) {
-    console.log("\n  ** REWARD WINDOW EXPIRED (day > 35) - Rewards = 0 **");
+    console.log("\n  ** REWARD WINDOW EXPIRED (day > 40) - Rewards = 0 **");
     console.log(`  Unstaking will return 0 rewards (closes account, recovers ~0.002 SOL rent).`);
     console.log(`  Your airdrop tokens were already sent to your wallet on claim.`);
     console.log("\n" + "=".repeat(72) + "\n");

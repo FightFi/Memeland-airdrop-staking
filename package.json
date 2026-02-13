@@ -8,6 +8,7 @@
     "test:devnet": "env-cmd -f .env.testnet yarn test",
     "generate-keypairs": "ts-node scripts/generate-keypairs.ts",
     "build-merkle": "ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/build-merkle-tree.ts",
+    "validate-allowlist": "ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/validate-allowlist.ts",
     "init-pool:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/initialize-pool.ts",
     "init-pool:prod": "env-cmd -f .env.prod ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/initialize-pool.ts",
     "snapshot:devnet": "env-cmd -f .env.testnet ts-node --compiler-options '{\"types\":[\"node\",\"mocha\",\"chai\"],\"lib\":[\"es2020\"]}' scripts/snapshot.ts",

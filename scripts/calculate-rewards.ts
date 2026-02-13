@@ -2,7 +2,7 @@
  * calculate-rewards.ts
  *
  * Calculate accumulated staking rewards for a specific address.
- * Replicates the on-chain `calculate_user_rewards` logic (lib.rs:546-574).
+ * Replicates the on-chain `calculate_user_rewards` logic.
  *
  * Usage:
  *   yarn rewards:devnet <ADDRESS>
@@ -37,7 +37,6 @@ interface PoolData {
   totalStaked: bigint;
   totalAirdropClaimed: bigint;
   snapshotCount: number;
-  terminated: number;
   paused: number;
   dailyRewards: bigint[];
   dailySnapshots: bigint[];
@@ -68,9 +67,6 @@ function parsePoolState(data: Buffer): PoolData {
   offset += 8;
 
   const snapshotCount = data.readUInt8(offset);
-  offset += 1;
-
-  const terminated = data.readUInt8(offset);
   offset += 1;
 
   // bump
@@ -110,7 +106,6 @@ function parsePoolState(data: Buffer): PoolData {
     totalStaked,
     totalAirdropClaimed,
     snapshotCount,
-    terminated,
     paused,
     dailyRewards,
     dailySnapshots,
@@ -137,7 +132,7 @@ function formatTokens(amount: bigint, decimals = 9): string {
 }
 
 /**
- * Replicate on-chain calculate_user_rewards (new_lib.rs).
+ * Replicates on-chain calculate_user_rewards.
  * All users earn from day 0. Uses BigInt for u128 precision.
  */
 function calculateUserRewards(
