@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("AovZsuC2giiHcTZ7Rn2dz1rd89qB8pPkw1TBZRceQbqq");
+declare_id!("CoRoXM3uPR9Mm9ES8nggW2KGnfJdGBJHh49uq7As8gaq");
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -16,8 +16,7 @@ pub const AIRDROP_POOL: u64 = 67_000_000_000_000_000;
 /// Staking rewards pool: 133_000_000 tokens × 10^9
 pub const STAKING_POOL: u64 = 133_000_000_000_000_000;
 
-/// TODO: Replace with actual admin pubkey before deployment
-pub const INIT_AUTHORITY: Pubkey = pubkey!("CpPPfLTUzytRXBrUUjb84EkYtA84CsoeVefhaJ2cyPg3");
+pub const INIT_AUTHORITY: Pubkey = pubkey!("65mxnibS4DL2qqL24GpMJqtNxgEzWgnARTMvXv5SePUb");
 
 // ── Seeds ──────────────────────────────────────────────────────────────────────
 
