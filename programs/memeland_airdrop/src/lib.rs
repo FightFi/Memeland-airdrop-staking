@@ -362,7 +362,7 @@ pub mod memeland_airdrop {
     /// Safety valve for misconfigured start_time or other deployment errors.
     pub fn cancel_pool_before_start(ctx: Context<CancelPoolBeforeStart>) -> Result<()> {
         let pool_state_key = ctx.accounts.pool_state.key();
-        let pool = &ctx.accounts.pool_state;
+        let pool = &mut ctx.accounts.pool_state;
         let clock = Clock::get()?;
 
         require!(
@@ -381,6 +381,8 @@ pub mod memeland_airdrop {
             pool.pool_token_bump,
             pool_balance,
         )?;
+
+        pool.paused = 1;
 
         msg!(
             "Pool cancelled before start. {} tokens returned to admin.",
