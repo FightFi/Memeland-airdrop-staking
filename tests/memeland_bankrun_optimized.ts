@@ -237,7 +237,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
     for (let i = 0; i < TOTAL_DAYS; i++) rewards[i] = rewardsPerDay;
 
     await program.methods
-      .initializePool(new BN(startTime), Array.from(multiMerkleRoot), rewards)
+      .initializePool(new BN(startTime), Array.from(multiMerkleRoot), AIRDROP_POOL, rewards)
       .accounts({
         admin: admin.publicKey,
         poolState: poolStatePda,
@@ -402,7 +402,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
     rewards[19] = rewards[19].add(STAKING_POOL.mod(new BN(20)));
 
     await program.methods
-      .initializePool(new BN(st), Array.from(multiMerkleRoot), rewards)
+      .initializePool(new BN(st), Array.from(multiMerkleRoot), AIRDROP_POOL, rewards)
       .accounts({
         admin: admin.publicKey,
         poolState: pState,
@@ -501,7 +501,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
         const rewards = Array(32).fill(new BN(0));
         for (let i = 0; i < 20; i++) rewards[i] = STAKING_POOL.div(new BN(20));
 
-        await program.methods.initializePool(new BN(st), Array.from(multiMerkleRoot), rewards)
+        await program.methods.initializePool(new BN(st), Array.from(multiMerkleRoot), AIRDROP_POOL, rewards)
             .accounts({
                 admin: admin.publicKey,
                 poolState: ePoolState,
@@ -674,7 +674,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
 
         const rewards = computeDailyRewards();
 
-        await program.methods.initializePool(new BN(startTime), Array.from(multiMerkleRoot), rewards)
+        await program.methods.initializePool(new BN(startTime), Array.from(multiMerkleRoot), AIRDROP_POOL, rewards)
             .accounts({
                 admin: admin.publicKey,
                 poolState: mPoolState,
@@ -782,7 +782,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
         await warpTo(poolStart - 100);
 
         const rewards = computeDailyRewards();
-        await program.methods.initializePool(new BN(poolStart), Array.from(rMerkleRoot), rewards)
+        await program.methods.initializePool(new BN(poolStart), Array.from(rMerkleRoot), AIRDROP_POOL, rewards)
             .accounts({
                 admin: admin.publicKey,
                 poolState: rPoolState,
@@ -830,7 +830,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
         }
     });
 
-    it("Airdrop Expiration: Fails to claim after Day 35 (StakingPeriodEnded)", async () => {
+    it("Airdrop Expiration: Fails to claim after Day 35 (ClaimWindowEnded)", async () => {
         // Warp to Day 36 (past claim window)
         await warpTo(poolStart + (CLAIM_WINDOW_DAYS + 1) * SECONDS_PER_DAY);
 
@@ -856,7 +856,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
         } catch (e: any) {
             const msg = (e.message || "").toString();
             console.log("Debug Expired Error:", msg);
-            expect(msg).to.satisfy((m: string) => m.includes("StakingPeriodEnded") || m.includes("6018") || m.includes("0x1782"));
+            expect(msg).to.satisfy((m: string) => m.includes("ClaimWindowEnded") || m.includes("6018") || m.includes("0x1782"));
         }
     });
 
@@ -909,7 +909,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
         poolStart = Math.floor(Date.now() / 1000) + 1000;
         await warpTo(poolStart - 100);
 
-        await program.methods.initializePool(new BN(poolStart), Array.from(tMerkleRoot), computeDailyRewards())
+        await program.methods.initializePool(new BN(poolStart), Array.from(tMerkleRoot), AIRDROP_POOL, computeDailyRewards())
             .accounts({
                 admin: admin.publicKey,
                 poolState: tPoolState,
@@ -1016,7 +1016,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
             rewards[0] = rewards[0].add(new BN(1));
 
             try {
-                await program.methods.initializePool(new BN(stSum), Array.from(multiMerkleRoot), rewards)
+                await program.methods.initializePool(new BN(stSum), Array.from(multiMerkleRoot), AIRDROP_POOL, rewards)
                     .accounts({
                         admin: admin.publicKey,
                         poolState: pState,
@@ -1050,7 +1050,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
             rewards[1] = dayReward.sub(new BN(100));
 
             try {
-                await program.methods.initializePool(new BN(stOrder), Array.from(multiMerkleRoot), rewards)
+                await program.methods.initializePool(new BN(stOrder), Array.from(multiMerkleRoot), AIRDROP_POOL, rewards)
                     .accounts({
                         admin: admin.publicKey,
                         poolState: pState,
@@ -1093,7 +1093,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
             await warpTo(startTime - 100);
 
             const rewards = computeDailyRewards();
-            await program.methods.initializePool(new BN(startTime), Array.from(xMerkleRoot), rewards)
+            await program.methods.initializePool(new BN(startTime), Array.from(xMerkleRoot), AIRDROP_POOL, rewards)
                 .accounts({
                     admin: admin.publicKey,
                     poolState: xPoolState,
@@ -1170,7 +1170,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
             await warpTo(poolStart - 100);
 
             const rewards = computeDailyRewards();
-            await program.methods.initializePool(new BN(poolStart), Array.from(fMerkleRoot), rewards)
+            await program.methods.initializePool(new BN(poolStart), Array.from(fMerkleRoot), AIRDROP_POOL, rewards)
                 .accounts({
                     admin: admin.publicKey,
                     poolState: fPoolState,
@@ -1242,7 +1242,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
             const xStart = Math.floor(Date.now() / 1000) + 1000;
 
             await warpTo(xStart - 100);
-            await program.methods.initializePool(new BN(xStart), Array.from(getMerkleRoot(xMerkle)), computeDailyRewards())
+            await program.methods.initializePool(new BN(xStart), Array.from(getMerkleRoot(xMerkle)), AIRDROP_POOL, computeDailyRewards())
                 .accounts({ admin: admin.publicKey, poolState: xState, tokenMint: xMint, poolTokenAccount: xToken, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY }).signers([admin]).rpc();
 
             const adminAta = await getOrCreateATABankrun(xMint, admin.publicKey);
@@ -1307,7 +1307,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
       crStart = Math.floor(Date.now() / 1000) + 1000;
       await warpTo(crStart - 100);
 
-      await program.methods.initializePool(new BN(crStart), Array.from(crMerkleRoot), computeDailyRewards())
+      await program.methods.initializePool(new BN(crStart), Array.from(crMerkleRoot), AIRDROP_POOL, computeDailyRewards())
         .accounts({
           admin: admin.publicKey,
           poolState: crPoolState,
@@ -1388,7 +1388,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
       reStart = Math.floor(Date.now() / 1000) + 1000;
       await warpTo(reStart - 100);
 
-      await program.methods.initializePool(new BN(reStart), Array.from(multiMerkleRoot), computeDailyRewards())
+      await program.methods.initializePool(new BN(reStart), Array.from(multiMerkleRoot), AIRDROP_POOL, computeDailyRewards())
         .accounts({
           admin: admin.publicKey,
           poolState: rePoolState,
@@ -1500,7 +1500,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
       tpStart = Math.floor(Date.now() / 1000) + 1000;
       await warpTo(tpStart - 100);
 
-      await program.methods.initializePool(new BN(tpStart), Array.from(multiMerkleRoot), computeDailyRewards())
+      await program.methods.initializePool(new BN(tpStart), Array.from(multiMerkleRoot), AIRDROP_POOL, computeDailyRewards())
         .accounts({
           admin: admin.publicKey,
           poolState: tpPoolState,
@@ -1588,7 +1588,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
       ppStart = Math.floor(Date.now() / 1000) + 1000;
       await warpTo(ppStart - 100);
 
-      await program.methods.initializePool(new BN(ppStart), Array.from(multiMerkleRoot), computeDailyRewards())
+      await program.methods.initializePool(new BN(ppStart), Array.from(multiMerkleRoot), AIRDROP_POOL, computeDailyRewards())
         .accounts({
           admin: admin.publicKey,
           poolState: ppPoolState,
@@ -1672,7 +1672,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
       srStart = Math.floor(Date.now() / 1000) + 1000;
       await warpTo(srStart - 100);
 
-      await program.methods.initializePool(new BN(srStart), Array.from(srMerkleRoot), computeDailyRewards())
+      await program.methods.initializePool(new BN(srStart), Array.from(srMerkleRoot), AIRDROP_POOL, computeDailyRewards())
         .accounts({
           admin: admin.publicKey,
           poolState: srPoolState,
@@ -1738,7 +1738,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
       await fundAccount(d0User.publicKey);
       await warpTo(d0Start - 100);
 
-      await program.methods.initializePool(new BN(d0Start), Array.from(getMerkleRoot(d0Merkle)), computeDailyRewards())
+      await program.methods.initializePool(new BN(d0Start), Array.from(getMerkleRoot(d0Merkle)), AIRDROP_POOL, computeDailyRewards())
         .accounts({ admin: admin.publicKey, poolState: d0PoolState, tokenMint: d0Pool, poolTokenAccount: d0PoolToken, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
         .signers([admin]).rpc();
 
@@ -1781,7 +1781,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
       const sdStart = Math.floor(Date.now() / 1000) + 1000;
       await warpTo(sdStart - 100);
 
-      await program.methods.initializePool(new BN(sdStart), Array.from(multiMerkleRoot), computeDailyRewards())
+      await program.methods.initializePool(new BN(sdStart), Array.from(multiMerkleRoot), AIRDROP_POOL, computeDailyRewards())
         .accounts({
           admin: admin.publicKey,
           poolState: sdPoolState,
@@ -1817,7 +1817,7 @@ describe("Memeland Airdrop Staking - Optimized Bankrun Suite", () => {
       const pastStart = now - 3600;
 
       try {
-        await program.methods.initializePool(new BN(pastStart), Array.from(multiMerkleRoot), computeDailyRewards())
+        await program.methods.initializePool(new BN(pastStart), Array.from(multiMerkleRoot), AIRDROP_POOL, computeDailyRewards())
           .accounts({
             admin: admin.publicKey,
             poolState: pState,

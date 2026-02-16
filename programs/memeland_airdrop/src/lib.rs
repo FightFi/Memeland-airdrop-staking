@@ -39,6 +39,7 @@ pub mod memeland_airdrop {
         ctx: Context<InitializePool>,
         start_time: i64,
         merkle_root: [u8; 32],
+        allowlist_total_raw: u64,
         daily_rewards: [u64; 20],
     ) -> Result<()> {
         let clock = Clock::get()?;
@@ -46,14 +47,23 @@ pub mod memeland_airdrop {
             start_time > clock.unix_timestamp,
             ErrorCode::StartTimeInPast
         );
+        require!(
+            ctx.accounts.token_mint.decimals == 9,
+            ErrorCode::InvalidMintDecimals
+        );
 
         let pool = &mut ctx.accounts.pool_state;
         pool.admin = ctx.accounts.admin.key();
         pool.token_mint = ctx.accounts.token_mint.key();
         pool.pool_token_account = ctx.accounts.pool_token_account.key();
+        require!(
+            allowlist_total_raw == AIRDROP_POOL,
+            ErrorCode::InvalidAllowlistTotal
+        );
         pool.merkle_root = merkle_root;
+        pool.allowlist_total_raw = allowlist_total_raw;
         pool.start_time = start_time;
-        pool.total_staked = AIRDROP_POOL;
+        pool.total_staked = allowlist_total_raw;
         pool.total_airdrop_claimed = 0;
         pool.snapshot_count = 0;
         pool.paused = 0;
@@ -101,8 +111,9 @@ pub mod memeland_airdrop {
         let clock = Clock::get()?;
 
         require!(pool.paused == 0, ErrorCode::PoolPaused);
+        require!(amount > 0, ErrorCode::InvalidClaimAmount);
         require!(
-            clock.unix_timestamp > pool.start_time,
+            clock.unix_timestamp >= pool.start_time,
             ErrorCode::PoolNotStartedYet
         );
 
@@ -110,7 +121,10 @@ pub mod memeland_airdrop {
         let current_day = get_current_day(pool.start_time, clock.unix_timestamp);
 
         // Block claims after the claim window ends (day 40+)
-        require!(current_day < CLAIM_WINDOW_DAYS, ErrorCode::StakingPeriodEnded);
+        require!(current_day < CLAIM_WINDOW_DAYS, ErrorCode::ClaimWindowEnded);
+
+        // Bound proof depth to prevent compute waste (2^20 > 1M leaves)
+        require!(proof.len() <= 20, ErrorCode::ProofTooLong);
 
         // Verify merkle proof
         let user_bytes = ctx.accounts.user.key().to_bytes();
@@ -166,7 +180,7 @@ pub mod memeland_airdrop {
 
     /// Anyone can call snapshot once daily (any time during the day).
     /// Records total_staked for the current day.
-    /// Claims/unstakes are blocked until the previous day's snapshot is taken.
+    /// Unstakes are blocked until the previous day's snapshot is taken.
     pub fn snapshot(ctx: Context<Snapshot>) -> Result<()> {
         let pool = &mut ctx.accounts.pool_state;
         let clock = Clock::get()?;
@@ -341,6 +355,37 @@ pub mod memeland_airdrop {
         emit!(TokensRecovered { amount: pool_balance });
 
         msg!("{} tokens recovered.", pool_balance);
+        Ok(())
+    }
+
+    /// Cancel a pool before it starts and recover all funded tokens.
+    /// Safety valve for misconfigured start_time or other deployment errors.
+    pub fn cancel_pool_before_start(ctx: Context<CancelPoolBeforeStart>) -> Result<()> {
+        let pool_state_key = ctx.accounts.pool_state.key();
+        let pool = &ctx.accounts.pool_state;
+        let clock = Clock::get()?;
+
+        require!(
+            clock.unix_timestamp < pool.start_time,
+            ErrorCode::PoolAlreadyStarted
+        );
+
+        let pool_balance = ctx.accounts.pool_token_account.amount;
+        require!(pool_balance > 0, ErrorCode::NothingToRecover);
+
+        transfer_from_pool_pda(
+            &ctx.accounts.token_program,
+            &ctx.accounts.pool_token_account,
+            &ctx.accounts.admin_token_account,
+            &pool_state_key,
+            pool.pool_token_bump,
+            pool_balance,
+        )?;
+
+        msg!(
+            "Pool cancelled before start. {} tokens returned to admin.",
+            pool_balance
+        );
         Ok(())
     }
 
@@ -632,6 +677,32 @@ pub struct RecoverExpiredRewards<'info> {
 }
 
 #[derive(Accounts)]
+pub struct CancelPoolBeforeStart<'info> {
+    #[account(
+        constraint = admin.key() == pool_state.admin @ ErrorCode::UnauthorizedAdmin,
+    )]
+    pub admin: Signer<'info>,
+
+    #[account(mut)]
+    pub pool_state: Account<'info, PoolState>,
+
+    #[account(
+        mut,
+        constraint = pool_token_account.key() == pool_state.pool_token_account @ ErrorCode::InvalidPoolTokenAccount,
+    )]
+    pub pool_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        token::mint = pool_state.token_mint,
+        token::authority = admin,
+    )]
+    pub admin_token_account: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
 pub struct PausePool<'info> {
     /// Must be the pool admin to pause/unpause
     #[account(
@@ -653,6 +724,7 @@ pub struct PoolState {
     pub token_mint: Pubkey,         // 32
     pub pool_token_account: Pubkey, // 32
     pub merkle_root: [u8; 32],      // 32
+    pub allowlist_total_raw: u64,   // 8
     pub start_time: i64,            // 8
     pub total_staked: u64,          // 8
     pub total_airdrop_claimed: u64, // 8
@@ -772,12 +844,24 @@ pub enum ErrorCode {
     InvalidPoolTokenAccount,
 
     // ── Recovery Errors ────────────────────────────────────────────────────────
-    #[msg("No tokens to recover - pool balance equals staked amount")]
+    #[msg("No tokens to recover - pool balance is zero")]
     NothingToRecover,
     #[msg("Pool not started yet - must wait until start time")]
     PoolNotStartedYet,
-    #[msg("Staking period has ended - claims are no longer accepted")]
-    StakingPeriodEnded,
+    #[msg("Claim window has ended - claims are no longer accepted")]
+    ClaimWindowEnded,
     #[msg("Claim window still open - cannot recover until day 40")]
     ClaimWindowStillOpen,
+
+    // ── Audit Additions ───────────────────────────────────────────────────────
+    #[msg("Invalid mint decimals - expected 9")]
+    InvalidMintDecimals,
+    #[msg("Allowlist total does not match expected airdrop pool")]
+    InvalidAllowlistTotal,
+    #[msg("Claim amount must be greater than zero")]
+    InvalidClaimAmount,
+    #[msg("Merkle proof exceeds maximum depth")]
+    ProofTooLong,
+    #[msg("Pool has already started - cannot cancel")]
+    PoolAlreadyStarted,
 }
