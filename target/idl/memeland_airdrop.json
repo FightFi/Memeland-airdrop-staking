@@ -72,6 +72,46 @@
       ]
     },
     {
+      "name": "cancel_pool_before_start",
+      "docs": [
+        "Cancel a pool before it starts and recover all funded tokens.",
+        "Safety valve for misconfigured start_time or other deployment errors."
+      ],
+      "discriminator": [
+        140,
+        244,
+        84,
+        149,
+        230,
+        99,
+        1,
+        181
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "pool_state",
+          "writable": true
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "admin_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "claim_airdrop",
       "docs": [
         "Claim airdrop via merkle proof. Tokens are sent directly to user wallet.",
@@ -313,6 +353,10 @@
           }
         },
         {
+          "name": "allowlist_total_raw",
+          "type": "u64"
+        },
+        {
           "name": "daily_rewards",
           "type": {
             "array": [
@@ -410,7 +454,7 @@
       "docs": [
         "Anyone can call snapshot once daily (any time during the day).",
         "Records total_staked for the current day.",
-        "Claims/unstakes are blocked until the previous day's snapshot is taken."
+        "Unstakes are blocked until the previous day's snapshot is taken."
       ],
       "discriminator": [
         144,
@@ -760,7 +804,7 @@
     {
       "code": 6015,
       "name": "NothingToRecover",
-      "msg": "No tokens to recover - pool balance equals staked amount"
+      "msg": "No tokens to recover - pool balance is zero"
     },
     {
       "code": 6016,
@@ -769,13 +813,38 @@
     },
     {
       "code": 6017,
-      "name": "StakingPeriodEnded",
-      "msg": "Staking period has ended - claims are no longer accepted"
+      "name": "ClaimWindowEnded",
+      "msg": "Claim window has ended - claims are no longer accepted"
     },
     {
       "code": 6018,
       "name": "ClaimWindowStillOpen",
       "msg": "Claim window still open - cannot recover until day 40"
+    },
+    {
+      "code": 6019,
+      "name": "InvalidMintDecimals",
+      "msg": "Invalid mint decimals - expected 9"
+    },
+    {
+      "code": 6020,
+      "name": "InvalidAllowlistTotal",
+      "msg": "Allowlist total does not match expected airdrop pool"
+    },
+    {
+      "code": 6021,
+      "name": "InvalidClaimAmount",
+      "msg": "Claim amount must be greater than zero"
+    },
+    {
+      "code": 6022,
+      "name": "ProofTooLong",
+      "msg": "Merkle proof exceeds maximum depth"
+    },
+    {
+      "code": 6023,
+      "name": "PoolAlreadyStarted",
+      "msg": "Pool has already started - cannot cancel"
     }
   ],
   "types": [
@@ -875,6 +944,10 @@
                 32
               ]
             }
+          },
+          {
+            "name": "allowlist_total_raw",
+            "type": "u64"
           },
           {
             "name": "start_time",

@@ -299,8 +299,8 @@ async function main() {
       console.error("\n❌ Failed: Invalid merkle proof.");
     } else if (errMsg.includes("AirdropPoolExhausted")) {
       console.error("\n❌ Failed: Airdrop pool exhausted (67M limit reached).");
-    } else if (errMsg.includes("StakingPeriodEnded")) {
-      console.error("\n❌ Failed: Staking period has ended — claims no longer accepted.");
+    } else if (errMsg.includes("ClaimWindowEnded")) {
+      console.error("\n❌ Failed: Claim window has ended — claims no longer accepted.");
     } else if (errMsg.includes("already in use")) {
       console.error("\n❌ Failed: Already claimed (ClaimMarker exists).");
     } else {

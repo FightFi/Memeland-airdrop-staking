@@ -19,7 +19,7 @@
  *
  * What this script does:
  *   1. Reads merkle root from the merkle JSON file
- *   2. Calls initialize_pool(start_time, merkle_root, daily_rewards)
+ *   2. Calls initialize_pool(start_time, merkle_root, allowlist_total_raw, daily_rewards)
  *   3. Transfers 200M tokens from admin ATA to the pool token account
  */
 
@@ -213,7 +213,7 @@ async function main() {
     process.exit(0);
   }
   const tx = await program.methods
-    .initializePool(new BN(startTime), merkleRoot, dailyRewards)
+    .initializePool(new BN(startTime), merkleRoot, new BN("67000000000000000"), dailyRewards)
     .accounts({
       admin: admin.publicKey,
       poolState,

@@ -90,6 +90,9 @@ function parsePoolState(data: Buffer): PoolData {
   const merkleRoot = Array.from(data.slice(offset, offset + 32));
   offset += 32;
 
+  // allowlist_total_raw: u64 (added in audit)
+  offset += 8;
+
   const startTime = Number(data.readBigInt64LE(offset));
   offset += 8;
 
@@ -230,6 +233,7 @@ async function main() {
 
   // Calculate time-based metrics
   const elapsedSeconds = Math.max(0, now - pool.startTime);
+  console.log(pool.startTime, now)
   const currentDay = pool.startTime > now ? 0 : Math.floor(elapsedSeconds / SECONDS_PER_DAY);
   const daysRemaining = Math.max(0, TOTAL_DAYS - currentDay + 1);
   const isExpired = currentDay >= CLAIM_WINDOW_DAYS;
