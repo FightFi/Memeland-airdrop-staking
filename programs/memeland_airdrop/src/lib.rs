@@ -653,6 +653,7 @@ pub struct PoolState {
     pub token_mint: Pubkey,         // 32
     pub pool_token_account: Pubkey, // 32
     pub merkle_root: [u8; 32],      // 32
+    pub allowlist_total_raw: u64,   // 8
     pub start_time: i64,            // 8
     pub total_staked: u64,          // 8
     pub total_airdrop_claimed: u64, // 8

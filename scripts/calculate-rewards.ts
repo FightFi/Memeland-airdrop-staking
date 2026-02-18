@@ -57,6 +57,8 @@ function parsePoolState(data: Buffer): PoolData {
   const merkleRoot = Array.from(data.slice(offset, offset + 32));
   offset += 32;
 
+  offset += 8; // allowlist_total_raw (skip)
+
   const startTime = Number(data.readBigInt64LE(offset));
   offset += 8;
 

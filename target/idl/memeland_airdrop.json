@@ -877,6 +877,10 @@
             }
           },
           {
+            "name": "allowlist_total_raw",
+            "type": "u64"
+          },
+          {
             "name": "start_time",
             "type": "i64"
           },

@@ -85,8 +85,8 @@ async function main() {
 
     // Quick parse for display
     const data = poolAccount.data;
-    const startTime = Number(data.readBigInt64LE(8 + 32 + 32 + 32 + 32));
-    const snapshotCount = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8);
+    const startTime = Number(data.readBigInt64LE(8 + 32 + 32 + 32 + 32 + 8));
+    const snapshotCount = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 8);
     const currentDay = getCurrentDay(startTime, now);
 
     console.log("=".repeat(60));

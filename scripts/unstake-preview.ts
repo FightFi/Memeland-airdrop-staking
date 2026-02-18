@@ -65,6 +65,7 @@ function parsePoolState(data: Buffer): PoolData {
   const tokenMint = new PublicKey(data.slice(offset, offset + 32)); offset += 32;
   const poolTokenAccount = new PublicKey(data.slice(offset, offset + 32)); offset += 32;
   const merkleRoot = Array.from(data.slice(offset, offset + 32)); offset += 32;
+  offset += 8; // allowlist_total_raw (skip)
   const startTime = Number(data.readBigInt64LE(offset)); offset += 8;
   const totalStaked = data.readBigUInt64LE(offset); offset += 8;
   const totalAirdropClaimed = data.readBigUInt64LE(offset); offset += 8;

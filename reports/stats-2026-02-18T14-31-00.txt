@@ -1,0 +1,854 @@
+
+══════════════════════════════════════════════════════════════════════
+   MEMELAND AIRDROP & STAKING - POOL STATISTICS
+══════════════════════════════════════════════════════════════════════
+
+   Status: 🟢 ACTIVE          Network: MAINNET
+
+┌─ POOL INFO ─────────────────────────────────────────────────────┐
+│  Address:     4VrttySZyWGZYaAW9qgAfp3dZzxGza7q1CZU8BsXiUrW
+│  Admin:       65mxnibS4DL2qqL24GpMJqtNxgEzWgnARTMvXv5SePUb
+│  Token Mint:  8f62NyJGo7He5uWeveTA2JJQf4xzf8aqxkmzxRQ3mxfU
+└─────────────────────────────────────────────────────────────────┘
+
+┌─ TIME PROGRESS ─────────────────────────────────────────────────┐
+│  Started:       Mon, 16 Feb 2026 18:17:43 GMT
+│  Current Day:   1 / 20 (20 days remaining)
+│  Elapsed:       1d 20h 13m
+│  Progress:     [█░░░░░░░░░░░░░░░░░░░] 5%
+└─────────────────────────────────────────────────────────────────┘
+
+┌─ AIRDROP CLAIMS ────────────────────────────────────────────────┐
+│  Eligible Wallets:  913
+│  Eligible Amount:   67,000,000.00 tokens
+│  Total Claimed:     433 wallets
+│  Claimed Amount:    38,586,668.02 / 67,000,000.00 (57.59%)
+│  Remaining:         28,413,331.98 tokens
+│  Pool Usage:       [███████████░░░░░░░░░] 57.6%
+└─────────────────────────────────────────────────────────────────┘
+
+┌─ STAKING ───────────────────────────────────────────────────────┐
+│  Active Stakers:   388 (on-chain)
+│  Unstaked:         45 users (on-chain)
+│  Rewards Paid:     487,718.31 tokens
+│  Total Staked:     66,017,294.55 tokens
+│  Average Stake:    170,147.67 tokens
+│  Largest Stake:    9,029,455.58 tokens
+│  Smallest Stake:   242.30 tokens
+└─────────────────────────────────────────────────────────────────┘
+
+┌─ STAKERS ───────────────────────────────────────────────────────┐
+│   1. FLC999yrvNvzK6XHZKmEZd9p1pg7D2Ewr129pNixyVYY
+│              9,029,455.58 tokens (13.68%)
+│   2. CgBPXjisKfHnw5v368So3dFFcK5YNWWByVwucAR2mb2t
+│              6,003,570.81 tokens (9.09%)
+│   3. Gg1SxudNLJXbkPVBmrJxezwKxcRjxUgm9i7sYYBzypuv
+│              1,912,944.16 tokens (2.90%)
+│   4. 8nPdXXTETAmMtbr8k1vRVE3E2b7hE2UNSur2YEy55fFn
+│              1,376,537.31 tokens (2.09%)
+│   5. CTpd26RoAwGQ4gnqC9yvNAHxwJTRhnYRDkWQk9HSst7X
+│              1,008,645.20 tokens (1.53%)
+│   6. FW5vffajC1wCb1ZztC7bNMQhz3rKy1jKMBqvU5eivYrw
+│                911,135.95 tokens (1.38%)
+│   7. GffvQ8LAQ3TgiSdCnUftnrs9mCCV93gUh3v9eE84qSTE
+│                829,458.99 tokens (1.26%)
+│   8. 3wuQFjCDBPZoMxkoL3xFqM1ew5P4kvRuj37ea8obZD1E
+│                809,395.17 tokens (1.23%)
+│   9. NkNpKowCVRAtpa8VL4R94UAuvzt6RPqGA67xv56tQu6
+│                772,963.07 tokens (1.17%)
+│  10. 8jGS8x6pifRiQ2dVddRKt5yyYynohAwc5TRWhQkS4AL9
+│                746,623.30 tokens (1.13%)
+│  11. AcCSyMvciEHwU4BzQuRvcFnMeojo6Do3A1GPKNucVukr
+│                738,555.19 tokens (1.12%)
+│  12. 5EF2myRGH4LF1d45hYcWcH3faMxYBPFFTDMwfrEMNBcv
+│                611,389.45 tokens (0.93%)
+│  13. J63sUXiEwSU3DerD3FQhkyfLXzv9zw9JvhCwnddwZi3c
+│                565,481.02 tokens (0.86%)
+│  14. 6XfGv2t9tuvsfp92px5b48Lzcjitru8im2APGLaHJYEJ
+│                533,183.06 tokens (0.81%)
+│  15. 2G5DjtxGU4AyJvo3c2FVKxvYYcRTrb3KVJMVeFMmttnY
+│                524,008.31 tokens (0.79%)
+│  16. ATRYp9WZj4V84xXYa3HSTKN646mvtAnYybAwjCwUwRQ1
+│                523,417.59 tokens (0.79%)
+│  17. EcX4LwyRo4FRNMLZu2ooNMAJD2e9iH4jsAYaoh6fDgUN
+│                448,685.77 tokens (0.68%)
+│  18. Dzxps4zhsb6RTtK9pDSfFNvb9eakDhMWnJ35EZTJxMUU
+│                440,321.82 tokens (0.67%)
+│  19. 9T4gstpR6iZLwcFCg2RFDy85VQjCw9W8hR66jiSds4Pa
+│                417,487.13 tokens (0.63%)
+│  20. 8rZBAFtvnKz6cKRTL5uY4KhmNj652CaPww8LnnUmJJKk
+│                387,368.63 tokens (0.59%)
+│  21. 3JchJfRToa6xC7VHBM6goapGQpwnXz5ZZfZQGFrvBtTL
+│                386,041.91 tokens (0.58%)
+│  22. Ffy6pvPKVXyGWH5eAKcu4s2h3u8bugvRnGBdBefAKADi
+│                354,023.88 tokens (0.54%)
+│  23. 8SYTeR6GqUSJSrG8nRDyFbZhU25Kcp41PPKr2UZzxVe1
+│                296,002.12 tokens (0.45%)
+│  24. HT7LRFZxrR4dPqSdZkZhLaBf8zwYhkb89Zd7xHwqD8Lu
+│                269,566.12 tokens (0.41%)
+│  25. 3GumXW8AXcQzVUSLfDeh2myKkD5vciiG8kW9bnkiZvUm
+│                266,794.49 tokens (0.40%)
+│  26. BW37GKdGcMLtvx7t3aqPXqbfkKujcCZG3jXYTgbtveMU
+│                231,053.19 tokens (0.35%)
+│  27. Dc386eft7NJiYvvx8HBRbnya9BTnoKbnJnbvPK8xXHcr
+│                183,706.24 tokens (0.28%)
+│  28. jeuX4q4e8fHMqyYg7yMP8T7mDrfbYTFdpjFq6bYZkcq
+│                180,877.00 tokens (0.27%)
+│  29. ALMCmcXoYakYPtoJagiuLkuShMXhkCit1NKqQkfdsMq4
+│                175,064.67 tokens (0.27%)
+│  30. 2J19dZPLBTQzVDkqfUTfUnPeZVGm4n2NK3RebG7GUT1z
+│                165,934.47 tokens (0.25%)
+│  31. BgkwHgWvWYrbEH1CZoaoNQTBwvYbFb4WwjXb6tMripLA
+│                162,982.38 tokens (0.25%)
+│  32. 3MjSKJ5Wzq1fR3gJHyDczdrDdhg7B3JnmZuNQoLKWtaz
+│                151,615.33 tokens (0.23%)
+│  33. 2dJs28aFnBoaVDaSxj4gJcchY6LUpiEaCPDUzN93xwEp
+│                150,500.67 tokens (0.23%)
+│  34. 99qftkCuN9S5UKLmL218RR94D8hwPoPk5QBUDAk9JwRc
+│                150,290.53 tokens (0.23%)
+│  35. DjzmJzosLNa4NRKMh8c8fpRrHyWNw69S3AWo2WoiUXUx
+│                142,578.37 tokens (0.22%)
+│  36. 3SCNVnpMucoTHa4YtQFWu8JNGNjBdG8JjXJaRzgKDB5N
+│                140,625.44 tokens (0.21%)
+│  37. CBXa4QzhYN8an9fbWfjMC5qtHTDgEJA8hmg76zu6irdn
+│                139,491.02 tokens (0.21%)
+│  38. 47tLesdrznTPt4JdhjRxs81w663TYdsBy8kuTrHmnnEb
+│                138,562.18 tokens (0.21%)
+│  39. 4D9xufExq93DVh4jz4SP8VHtxdRjbhvy6NbM4nUcT2Mk
+│                134,504.88 tokens (0.20%)
+│  40. a5DdVpfCNchkr417fp8Hf4MfE9BCa9MsGafPh9Eh9xU
+│                116,045.83 tokens (0.18%)
+│  41. 4jMMSCksWKyJ72XeNw34drasUQMvL6mQ4Epnf8PDqZNa
+│                113,746.57 tokens (0.17%)
+│  42. F5rheKoNRmjZ3usUqRw6XibvfNA65KYgdNcxEPvsTw2B
+│                108,759.52 tokens (0.16%)
+│  43. 8dSdLtXJyyJcayfAtgijfpp6Uo7ERiuxJPi8cgSxSqK8
+│                105,626.73 tokens (0.16%)
+│  44. 6PkngRWQC1HWqmiL9XeCRxepuGiEYEtSiqfQhnY3xBHj
+│                104,854.42 tokens (0.16%)
+│  45. 7omZRr1n1aDLxfsvpcDi7oWgWJHaGcR3oZMwJBAjXqTC
+│                104,583.27 tokens (0.16%)
+│  46. 83pPEjxsrBqNXpgcrew8moJijzemJynD65U43Rm58sdQ
+│                 99,628.72 tokens (0.15%)
+│  47. BcyEvv6yLKPekqBYQUdyqzrCRrQMZG8LZT28bWzagKAT
+│                 95,776.85 tokens (0.15%)
+│  48. BaawJvbyEMiGLQZPGzuFy7Vm17wTP55jcFqiugCAYSV9
+│                 92,399.97 tokens (0.14%)
+│  49. HdgewnvFDzxmYkmsUnQW5DF24LP8oqdU9bZKauL5LQRv
+│                 89,508.50 tokens (0.14%)
+│  50. HaMy7WhfkcaJru758tdn7nWkek5m8J2FVYciRPSXKL8r
+│                 89,496.66 tokens (0.14%)
+│  51. FoQS4RvkULhSu19NKfmgu5GhzE1VCjEggbtvXctPwrp2
+│                 86,303.88 tokens (0.13%)
+│  52. 8GPQbSGXujunhY4eV6nquBSDxeYVGGx8mdJDKKe5Em5s
+│                 85,643.49 tokens (0.13%)
+│  53. GF9EXtqFiyKJjT4CVYUN49jo61VqAYpDnnGmckhQWrz1
+│                 85,359.36 tokens (0.13%)
+│  54. EXXiWfdYSDwqGUU4jye5qre4jqsELhaFLH7MxpHESSR1
+│                 69,463.13 tokens (0.11%)
+│  55. 9M9gBZiMJmZ4fyH3ZKN7q7TDfxGbWP2KPXNVXDuPbSG2
+│                 69,281.09 tokens (0.10%)
+│  56. A1LHfgxFE3PDm6QvUZFCyViJHZMc5pKsFipX2ctdRFhC
+│                 67,824.82 tokens (0.10%)
+│  57. 2xCm8a8g3xiHRuALWndo2UTDdPvo84hnzYZxW1akESRE
+│                 65,786.40 tokens (0.10%)
+│  58. DEdbqX3x8AVNZBXENo5SYMzetcfNzqHKSypPV4ah2Xpb
+│                 62,514.07 tokens (0.09%)
+│  59. 4Z1mJZMtAJ3Mqb96b9A64Pm99LToBQYxk2cATGC8uwXZ
+│                 61,743.23 tokens (0.09%)
+│  60. 8MWWADcws9jtcnv3dZ2QzKGGnzBsaeEFtABJ4EbM2g2V
+│                 60,662.98 tokens (0.09%)
+│  61. 7jWNMeYj4CChukpRXaK5Q4w8jZHNRjfWRutRuXWun4sg
+│                 60,632.19 tokens (0.09%)
+│  62. 5RYxaid5pouMukcwxWPKGsvjovADpbNUSEwtE6AG3oQX
+│                 59,583.26 tokens (0.09%)
+│  63. 2zgwTSFyrfPXRjXUyE3Hxobp9j6oqrEC4629n4rVv2Kb
+│                 58,618.28 tokens (0.09%)
+│  64. 4re1h1Ag7UNdosWUnAonQ2UemEaCiFij818KxZZ2i1FC
+│                 58,458.14 tokens (0.09%)
+│  65. Au8FYkaRiANdHPQkH3wzD1uEEwEdfZPZzM4yhMhM1uJg
+│                 58,359.77 tokens (0.09%)
+│  66. HVQRGjMz7aVWJBSv1NsWJnawWRU9JzMuP4ByahXrJEBi
+│                 56,078.41 tokens (0.08%)
+│  67. GFLBohUDFWHZ6htZ7NAUXtvVGLYoxBhbLmoUh6BRjeqf
+│                 54,569.48 tokens (0.08%)
+│  68. 6Tp9sbpTuff87WKgNuZPnV9xXWzcAtL2aPos8vece1Ra
+│                 54,223.47 tokens (0.08%)
+│  69. 8ne1NnsdC2Dtn7392CxqNyrUnHkHVos5tXKwddCSpDDY
+│                 52,307.22 tokens (0.08%)
+│  70. FCvDzi5nECuBScht4wYFiyKU6YUfHKTnGY69e3mRhhMT
+│                 51,960.82 tokens (0.08%)
+│  71. 4LEQQy7AC7TNyoey2QtuxvB9PgfhiMJYYDsGjZtiXf1z
+│                 51,960.82 tokens (0.08%)
+│  72. 9Gf5PKc6p9nuG6vFcscBdsQYu6snsouPwfYjzcepMVzC
+│                 51,466.62 tokens (0.08%)
+│  73. 8umHLaY4JiHnCjrhLVvBi5rTLg8VuyvNMQ7eE96zVhne
+│                 50,377.34 tokens (0.08%)
+│  74. z1hdP6VVT9bBV8wzmQQ9tY6ZigRcXyLW4qitS18dwKT
+│                 50,005.93 tokens (0.08%)
+│  75. H5eaKXTKhWidMoFKbZ1BUwmJsjCZbqb7bUM2Sb2Cc3Cw
+│                 48,496.76 tokens (0.07%)
+│  76. F7SRtWpcEz1HBPVoBeyRXMPhRe3WRqHnSiwW56f4CnzH
+│                 47,492.70 tokens (0.07%)
+│  77. q8qqNJqVAMHwakRdTyCuTNUgyA8E72RjXByc2b1awcj
+│                 44,100.77 tokens (0.07%)
+│  78. 9zhjAgHrzyy43JETsYNR8XRjZmCLwu6A2VW1YtpuZgXX
+│                 43,907.98 tokens (0.07%)
+│  79. FCCqwBQvU8Zw362t9BreNaFhwBYzshYWvevXKwWbw7HV
+│                 42,164.47 tokens (0.06%)
+│  80. ASqMdSi5JjWQgqsxX7m8X55QMFopd4JWWdakyBkvBYX5
+│                 41,621.19 tokens (0.06%)
+│  81. 41J3gvQeSQWF33ypsZyaEsXAFLh7ydJaLEX2XR9ExpPs
+│                 41,568.65 tokens (0.06%)
+│  82. GmcxS21vfzx1fWZA6tz359yWtsTDVdyRk2j3k1mVrPXz
+│                 40,656.35 tokens (0.06%)
+│  83. EMLs8byjzjtBr77q6CKTAbvXJTAniFsNMcLNH5dNfgAJ
+│                 40,306.95 tokens (0.06%)
+│  84. Dkjt3M3PZrEL4Y8JMNRgfwCPrLQsqtxK6GtV5hM25VE1
+│                 40,215.23 tokens (0.06%)
+│  85. 2yydgk4zArd12Vtrk7NFdpUKGWEgw7sd3Eax9tZTxAVP
+│                 38,454.50 tokens (0.06%)
+│  86. F9gSiBnxsAX3XRJP64abPADcRy89D14uKYita7ZY1RZ2
+│                 37,479.70 tokens (0.06%)
+│  87. BrbrLzXAhiZS3g2EbJmw1T8QhKQVhdUjB5PESovPowki
+│                 36,372.61 tokens (0.06%)
+│  88. 3xWihn8MzRwmm3GeudVWqKdDM8GAt6GYpaXjbA1BiNWe
+│                 35,789.99 tokens (0.05%)
+│  89. BHcEnBxqc4G5mYRDE8jSApAjLjtiZj5rXhiSbGeVAV5R
+│                 35,493.84 tokens (0.05%)
+│  90. 33HqeSUcpRQVev7W1rjUgmVZHz4jkXWQ1ijyFqrdo1k1
+│                 35,410.33 tokens (0.05%)
+│  91. 9MXxgt5PxrEe6oZoa8MtAKBNdpmmQdqMB2By76vawMTK
+│                 35,050.20 tokens (0.05%)
+│  92. GwsSX9ckq5qSbNRC3ZaQWr4ESiecCf3deMj7fSzhMkga
+│                 34,640.55 tokens (0.05%)
+│  93. CFvWacq7PzFp5Mv3wuYsCQhqn3oZm3ekSqmEe9jaVXxe
+│                 34,640.55 tokens (0.05%)
+│  94. 7ejtfNMGrmcqtaUo7jEvoLLYj2RjEcyjzaBabEu5yLaW
+│                 34,640.55 tokens (0.05%)
+│  95. 6DF1WrNsTDU9ZY7U9pKdxgtVC5wevQ2vxhsCzKv7VEbz
+│                 34,640.55 tokens (0.05%)
+│  96. 9n3SRU1zgHV3ZSvZc5igYDLivwM7RyRAZarctU8vaM9j
+│                 34,235.19 tokens (0.05%)
+│  97. D7ANRDpAek2CN8e9SA3XJFZDkETZ3kFwk2dzD6NCHefW
+│                 34,005.07 tokens (0.05%)
+│  98. A6WA5YKw9p5EBHTjDeJE7Mnqt5WhSuNK2eefuEahRc8z
+│                 33,686.16 tokens (0.05%)
+│  99. FBLM6m53XzMPsYiU7526gfd4VkBZ5VEoyMiQJK15C1wo
+│                 32,927.58 tokens (0.05%)
+│  100. HypGVnsCaDXMfLBQjWfdNemujpEF6uSkgLhpThWjx5gv
+│                 32,891.89 tokens (0.05%)
+│  101. 9LNPBjBcbkP4yKwSSQFic6XSEPzPco4ZyoJSH5ov5y8D
+│                 32,048.36 tokens (0.05%)
+│  102. EyPCmMcH4YCWxL9gF3EqMZiiy16Xg9PPYfw2ripNXrt7
+│                 31,428.06 tokens (0.05%)
+│  103. Ci7scynHjwaX4tUam9JGbVB9FedaXNLzS8HciMGbwSmF
+│                 29,566.10 tokens (0.04%)
+│  104. D5pNAoWDtoNsTtmccWSnmjW8Acug55THi1fckLNKFmn
+│                 28,943.58 tokens (0.04%)
+│  105. Dq4cZVE8SDBk9V28vqKu8qzxQXtiLeknks6QJkmSrzdt
+│                 27,712.44 tokens (0.04%)
+│  106. GuNuMVxFHDGmrZkaFuB7Gq7ayLbd9xvW7kS44m9H7BiB
+│                 26,508.28 tokens (0.04%)
+│  107. B4c7ppV4CrSbTkWxCfjQogbheprJrehzBspkm23NuBMj
+│                 26,424.76 tokens (0.04%)
+│  108. 9Sw1t5gcW7Uu931n998fHKbEVMSifeCGCjFEYiQ8MrPY
+│                 26,123.78 tokens (0.04%)
+│  109. 8LMAy1cFA4kArvpgWvWqxfLJvPTP7mHrgtdEnRTe86KZ
+│                 25,980.41 tokens (0.04%)
+│  110. AFvHuGwtFzBPrNNuAHYA7BBxNnSTNPjXSzWRviaezSuH
+│                 25,781.11 tokens (0.04%)
+│  111. 2YGh97JDkyCoy3bNtyX72sxrYo5zsm5qu1To9ZCAMxc4
+│                 24,664.26 tokens (0.04%)
+│  112. 7hLAtiPXFMhUbSEjrDWNpMZMaP1WAVy2HUxxsKgrTgr1
+│                 24,143.41 tokens (0.04%)
+│  113. 5aWxGBbuZeYXEE8uFCar3xhq8mZYFC2UgsEaEWJZnvLY
+│                 24,143.41 tokens (0.04%)
+│  114. ALDtrdVUGdMRLUjoY14yPEpC7e86esbM5KFTfcQDKzph
+│                 23,968.26 tokens (0.04%)
+│  115. FDWM2MRDpz9Xsu4JipfGQZMHqHRMSpz6PegXpJPVQXs6
+│                 23,939.10 tokens (0.04%)
+│  116. 5rYPAwx2zdqzFo13zUiC2cBBwE4gdk8z4Z51MaWKKnMM
+│                 23,157.27 tokens (0.04%)
+│  117. BdehyrATnWHNCmSTigW8kZkd4qhY9dwuDFjL1sJC11yp
+│                 22,762.86 tokens (0.03%)
+│  118. EeJWTw7H6o5vi51gSDXEBMWkUQRbzVcioqrS8AosnNf9
+│                 22,647.40 tokens (0.03%)
+│  119. 8AN2XVfuecAyq4staGJFjZoXPSu86xpvEKLwzgTgVGwa
+│                 22,325.98 tokens (0.03%)
+│  120. Dwjeqz1CsbrsRdMr9E4sapSq3ucK8v2fjjEWGNpagHUb
+│                 22,081.50 tokens (0.03%)
+│  121. 6hcxtAmwHsrdEnTjY3YHwbQ8TrbfNqE1ok5WxvZAsZ8h
+│                 21,182.84 tokens (0.03%)
+│  122. 7gHHXWjvc66cK9wjKJ9KgkQuAUZWkucNfAqsLtBzdmEy
+│                 20,973.09 tokens (0.03%)
+│  123. 7qKZjUymLKMgzHLvmQpXthC77twRv8JhMgo32zMgwAXE
+│                 20,897.95 tokens (0.03%)
+│  124. 9QoyRQH81zZB7qEVHxmcoxgvVYJa6sQADJpoKYWhiBFS
+│                 20,664.98 tokens (0.03%)
+│  125. BoDiaCeVxFACUKTHnFoC6vX9KErDv7xNx7BzEj6ywQLf
+│                 20,563.81 tokens (0.03%)
+│  126. 51b4SAQueRKjzLhs8R1Xfo8WE9HD5tdg8J7d8TWqTHfV
+│                 20,255.87 tokens (0.03%)
+│  127. 8osgdwSMdYrEUuX3FSn1dnnCdeL3pvDbTaP7wMaeebi2
+│                 20,228.02 tokens (0.03%)
+│  128. 4xYUgX899nYjiV3FqDDa9UENGTi8RH2FJGkrPc2R1fFk
+│                 20,103.95 tokens (0.03%)
+│  129. GJRxLw85mjEWJG6nwDCb5Bn4UkU44DcMiK3CSy6is2an
+│                 19,009.62 tokens (0.03%)
+│  130. koFfLEZbnowhfThbVZSGaXLr9BuyuFMQoupjeTESaja
+│                 17,866.28 tokens (0.03%)
+│  131. 5QrFGiDntLQM92pR6W4jQvzf3xPamoBw6waoMdH3mXmF
+│                 17,656.62 tokens (0.03%)
+│  132. AfDsmeQYFynhzL8RpW67bZpnSazUeoP19aD5cCsHMkBm
+│                 17,369.02 tokens (0.03%)
+│  133. 9pWowz6G57xBkVzgxLnyUy82ojZiLsZRP6qm53n6oBpu
+│                 17,320.27 tokens (0.03%)
+│  134. FECgUWLKgaBvXWosornXS5i9FykcY436Mp6soZSt2GJx
+│                 17,320.27 tokens (0.03%)
+│  135. BjdpRoXe9PBWg4dC2PX6FZDFgwUL31iTpVWkWrh7c8jX
+│                 17,297.44 tokens (0.03%)
+│  136. Cnsmq9j8QM6EYA9wSDWTH2c7MoEyRjxkFGwnMAtQ75mP
+│                 16,982.18 tokens (0.03%)
+│  137. DkewevhpCspncFpr7CBQKMPWgbaokrJsLZfLy67qfqA6
+│                 16,634.89 tokens (0.03%)
+│  138. 6RCwXMydBhv4TWCwufJLAHtLbzAA73FVtXJSspVufcRA
+│                 16,213.28 tokens (0.02%)
+│  139. DDxJK9pYBGDMPLsPxKZRM7ZwTnTgsi5s4RJav2W8333T
+│                 15,284.86 tokens (0.02%)
+│  140. F4gjPDsj6YvT53BrvWewfGBiRxCYSrY7Vb83wD4uv8nC
+│                 14,897.01 tokens (0.02%)
+│  141. AAjFKKzGWmT53VDsCw2Qjpf2wQfWUYE4vTtaKYtCCLc8
+│                 14,801.55 tokens (0.02%)
+│  142. 7RSkCtggpN4hVRFMEWxebWEvrL1rdB6B3Js12mfPvq2b
+│                 14,549.03 tokens (0.02%)
+│  143. 8xGFjxxNZLRYB1fgHfTvVsdvzuXaqebsX7VSxxUwJEXc
+│                 14,248.80 tokens (0.02%)
+│  144. 3TRb9d5HYj5bnBQwgs1yDesZZ7bkf5QEDBmxZ9nDxucr
+│                 14,044.00 tokens (0.02%)
+│  145. F4E7bDkn4qJvsGSqUeGmLkMJUpQXpszTQQK1MK8k2HYY
+│                 13,892.08 tokens (0.02%)
+│  146. GEUY3E9oZpvVw6yz83xGcJbz4LApodcQWHMYwJWgUE6G
+│                 13,471.00 tokens (0.02%)
+│  147. 8RACNQBphNpoTALqGG2VBtK4y9nAaUSDQJrWsKaSTEwP
+│                 13,053.57 tokens (0.02%)
+│  148. 6TB3kC6qVH5rQyNd9XN3qC9WMy82YFE8jee5qJ25MY3e
+│                 12,906.35 tokens (0.02%)
+│  149. 23Bs9SBD2s4CyXiR6BtsbFJTVmghjaGPuNEKfHxCWQEU
+│                 12,649.46 tokens (0.02%)
+│  150. BPAw7CffqaCeDCmQs4G4Sb3v74kKBjZWpguSL821MX7P
+│                 11,979.19 tokens (0.02%)
+│  151. ELrs8A9zBYtNMibujtFzL1cw8DgDVjULJLCJWQdPTYGu
+│                 10,647.42 tokens (0.02%)
+│  152. 3YmqRpiaUXntW5U2oXSqEebpUwQ4a7UM2pUwGuZvDadL
+│                 10,537.68 tokens (0.02%)
+│  153. 6nYz4FqJCQh1Qk4tgjmtJE19ru1FX75atDYSjvnzcQi8
+│                  9,926.90 tokens (0.02%)
+│  154. ApdaCgvkDHdky3UGDG96sqVYQXmG2pa8PwMnavAbJ7Pp
+│                  9,872.74 tokens (0.01%)
+│  155. Ao3TwELCZTm21GorJWaWvBxxVeYdYhnQetSi7BdzhLj9
+│                  9,798.67 tokens (0.01%)
+│  156. FhNJUnn1Rvwxs2tXAJPLEZKvn49dxHyq7SPEsntnQmQh
+│                  9,518.33 tokens (0.01%)
+│  157. 5o58TvCeTiJJfncFxbnsXvwy9h59DKoB9J75tqV4DVaH
+│                  9,455.66 tokens (0.01%)
+│  158. BK73jLHnGRz6TCAVvjf5RzAm3JL99NARnUSykR3jbrjX
+│                  9,153.29 tokens (0.01%)
+│  159. Ae3hzG2KRxSzhgQqrU1BUnPcXHWqqtJYatm2p2mPHVbH
+│                  8,987.38 tokens (0.01%)
+│  160. EN5fY1Yn4ig5mHFQmLbaTjWpxfb4BGao5Afqpsy2PA6e
+│                  8,578.78 tokens (0.01%)
+│  161. 7b619eDFv7uGXCuPTeRsbYphEJCtVUKH7MiiHuUopf2S
+│                  8,256.69 tokens (0.01%)
+│  162. 5b1XsBgLBTYVwFXV5fffzbM2pt3V2MBXZczrn8LyJeEm
+│                  8,102.97 tokens (0.01%)
+│  163. 7ac2ynw54YK9t5Z5QW7M8PE9WZHUJ6EnuDbw3Ls7jM4y
+│                  8,070.41 tokens (0.01%)
+│  164. 6QQ2nYoYPLEbwqfY4Ab6GsQ1tLr4PaWBRAgEc3TGtxL9
+│                  7,875.46 tokens (0.01%)
+│  165. HvYWMhqZb9Rs5rvhbDfMUYPpafAegRZ1DS4BPjUHQH9F
+│                  7,506.51 tokens (0.01%)
+│  166. 5utmQEyPpnkXBqVr2S8GRXj7bsMUmVXXcQUJVB8iiQQV
+│                  7,046.36 tokens (0.01%)
+│  167. CHTE2RnrYVGtbCG32LLH7hu9aZggp9EKA4k2RuHRrkaS
+│                  6,978.42 tokens (0.01%)
+│  168. EHSHdVYJa1bKpsDSp6M4SNbnjHgajgmpCezV6ZQA8wK2
+│                  6,928.11 tokens (0.01%)
+│  169. DaMsCNkSYRvXE1zneLesdKBEohRNiGzVcPaJzH3ho7U2
+│                  6,928.11 tokens (0.01%)
+│  170. 8Ls9JKtBQVPGkVUt8R2ZcgJtuNJTDZh3iPKxCT1vzU4w
+│                  6,928.11 tokens (0.01%)
+│  171. 47wLcXzMKcJL2xgUw9x7fQpKSNfmBWEuC4zZhCjkeaSv
+│                  6,928.11 tokens (0.01%)
+│  172. FE9KsX4L4y6ZzVhMYLnSsssSBv568zoiWewZ5Ks6QuvK
+│                  6,818.34 tokens (0.01%)
+│  173. 3xZ9ysZvJ154TZnMj7k1jvmUUcSr6T3suVGinergeF3R
+│                  6,534.11 tokens (0.01%)
+│  174. 76qzoUmD4JRVSs2sc1FL3K1wvckZBhwYzZHZ1oYLpy7T
+│                  6,408.50 tokens (0.01%)
+│  175. 6cyCtS8Qi3Tg9fkvKuVUEZpX7M29xJs8FoGyo3xNCN5w
+│                  6,284.46 tokens (0.01%)
+│  176. 7scqttptcHF3EQ8wxmxYjLaMwUvTXRoHunBDEnkKMtuJ
+│                  6,278.07 tokens (0.01%)
+│  177. 7isY4nKrAmhnFQ15Zi9aMBwhbQpmxAPnpxCSMRfqYuTV
+│                  6,250.36 tokens (0.01%)
+│  178. 3nHBAXNA6xGmsgYL9YMRjjV9XKAXnz1BSiQZquheETgs
+│                  6,222.39 tokens (0.01%)
+│  179. GKXTS1x1C7zMeezmVbyWj46AMbYSAsgx3q8gaCheHEUb
+│                  6,107.73 tokens (0.01%)
+│  180. 6UUt2PGTzB5aS2fywW8A56po3G7vnRa9LcJFm3uKvUp4
+│                  6,033.33 tokens (0.01%)
+│  181. 2ptxXewNsm3F28uTHCKiHcEe5HoHg4iQbkU77T7vTbS5
+│                  5,888.89 tokens (0.01%)
+│  182. 5ARFu9tnhaY9NbDbAVH92vJkeZ1AYQhtKkiZnftRyu6J
+│                  5,851.82 tokens (0.01%)
+│  183. 31HxBraKaRMKMcxN1dAZ1SB6kvCPhxbybrpiVWtq72eV
+│                  5,757.46 tokens (0.01%)
+│  184. CnZyGW9z9Ri1n53JafDUn2E16PLZ3T27nYj5qqy9dweg
+│                  5,655.48 tokens (0.01%)
+│  185. 4Tp1ffovkdKcP3y4pwqMnuyxXjbxuNQ2kZnEEYoBCakc
+│                  5,653.46 tokens (0.01%)
+│  186. 6ZBvtZyDZH39MTn8r8BFryVgerq9jSZmGQmibnva4w3L
+│                  5,465.94 tokens (0.01%)
+│  187. AATf9BcBC9eVbAMasDSS5Xf42zuuPghJFvKk6Xgyk89w
+│                  5,219.30 tokens (0.01%)
+│  188. CH1r28Q1dkHMtu9iZA6FY8bw9tpssRezHdz92g67oPqn
+│                  5,202.76 tokens (0.01%)
+│  189. 4X9g1MQh37TqQTEdkfwZvYWbn1FTj3yv5MnLE6Zoj6xk
+│                  5,196.08 tokens (0.01%)
+│  190. 87NpUcdfznwbfD3AwmhoDjbaMF8gbh4f8f65cRQvTuNo
+│                  5,196.08 tokens (0.01%)
+│  191. Gbryc7bNEnb4t3cxosPxqkRwDUxSsyTwjEtdKxs1KoLD
+│                  4,893.96 tokens (0.01%)
+│  192. 7znYuBQFSof6RsAnwxxMiajRsteMEPMixw34X9oR13Vg
+│                  4,684.36 tokens (0.01%)
+│  193. 3dkA2wWsB1EAL1kwhsevz83Raxgod6MvN2UBMj3tEKPs
+│                  4,676.47 tokens (0.01%)
+│  194. CefWevcCKz7h6zqFHiGAYr5cYBjXJjmeeA9UhVnzrm3D
+│                  4,519.86 tokens (0.01%)
+│  195. 58vZryhmASdpeYcNPkJNugCQdkaiyrAK3g2yHmWyqL8v
+│                  4,458.79 tokens (0.01%)
+│  196. 6pL3h6e4rd8ehqoxySCGatZJBiDpndFtrSM3RcWNRjtG
+│                  4,248.78 tokens (0.01%)
+│  197. 2YTEzT3bntBQNqmchAGAgNaXE2imr9xR6Td6sBoR45xV
+│                  4,057.25 tokens (0.01%)
+│  198. EzrwSkYZGS1zPqYMysvd2tfNJ5p6d8BaqJHyTaCxiMUn
+│                  3,815.65 tokens (0.01%)
+│  199. Gf97g6BYvV4vZLxWDdrJ2bV3MVJ46gfSx5nBVVDzASiS
+│                  3,810.46 tokens (0.01%)
+│  200. 2sXP9MzP867EWxFUAZXVgwhjpfMt34U16rWGDNN2CqUY
+│                  3,805.85 tokens (0.01%)
+│  201. 7PrrBiRadmM3iAy6Ai7Y8jwdseT2hFCd5QgurFc1udkP
+│                  3,802.07 tokens (0.01%)
+│  202. 5pUVyA9dtFX8BFWAgcBwbUzXoXgCFveWGxb8qjCf6xLg
+│                  3,799.77 tokens (0.01%)
+│  203. FeY3VgHSjWwTptVFsp6yhC57LWEZQK7vujCTRZJbk2Y5
+│                  3,692.97 tokens (0.01%)
+│  204. 4Pq7LcWZFCuaY8a8XR3zqjVqmf5B2iUyWRXoNpbN9pMs
+│                  3,632.79 tokens (0.01%)
+│  205. 3nH1VkqoxEf3EXvXaWQdG3FXVKWZyvfrJr9u2E4dvy7U
+│                  3,569.60 tokens (0.01%)
+│  206. BJmyBFeN2erHoG3PHuthojtzwdkj1So2CRvYyiaEPbY4
+│                  3,562.34 tokens (0.01%)
+│  207. CYjRo3zx1NE4zo4wd2MUUbCnZMsRnDRXx8FFBPArpvcJ
+│                  3,484.45 tokens (0.01%)
+│  208. HWXhKoBsuMbb5FL9QrKe31nfewvsXCDz7PS1PzUwjpF
+│                  3,465.83 tokens (0.01%)
+│  209. 7wbnNTKyMCFvXpUD4FU961uvvSPgtvXC8meNJrzxBM7d
+│                  3,464.05 tokens (0.01%)
+│  210. 3TLVcksCZn9etguFoK1dngTWjqs3rb3om8zgiicWfJyB
+│                  3,464.05 tokens (0.01%)
+│  211. 6c9EvR1RtvLaz2wvLY4xSvBBVWxGiBtxudkL1jx4yo18
+│                  3,464.05 tokens (0.01%)
+│  212. EiNh4qC7FmSDFm7FrnTGjk8UTFwJhkv4LHh5k76dFobn
+│                  3,464.05 tokens (0.01%)
+│  213. EX9z393ShAM5wWdfYA9vsqsKZRRJEVrkqBpgouyi7yj8
+│                  3,464.05 tokens (0.01%)
+│  214. AFbL8EZLiLTXE3vZF7eCijSNJ2WMZcGTbhpZsy6PDnK2
+│                  3,464.05 tokens (0.01%)
+│  215. 3ZhP84GCdyFv92u7sENy9YuNnKwKx1RBQKxGBkPCi4Rt
+│                  3,406.15 tokens (0.01%)
+│  216. DXfwQMb9StaQn3HrbLcnEDHGAbWdvU4ScwyHbXnyirdZ
+│                  3,342.21 tokens (0.01%)
+│  217. jZAtiMgsUr16fJrSuqQrefAqGu7H7bK5Pm1kPCjVEes
+│                  3,324.02 tokens (0.01%)
+│  218. 88c3qcKynwRxvUTbsAVhkXBzx7krUCLTNSYUXZF2ccNq
+│                  3,318.74 tokens (0.01%)
+│  219. 25oM2uHCrxHk8Gd1sbcJWvNoznk6JxWi6wjsWEokgHr3
+│                  3,311.12 tokens (0.01%)
+│  220. 6ws53oybfrTJeHJwy1uHfKyHEEXF93Z1iDZsPaQ8r6NW
+│                  3,305.60 tokens (0.01%)
+│  221. EThHt9Gzk5Zb6gQ22z56QpMBtWz6WhPeTXB8TVupzE7X
+│                  3,283.43 tokens (0.00%)
+│  222. 2oMaUP2gAAbaE7A3dUi1ecJvrBfMByd6NwvVVQcXir8U
+│                  3,275.85 tokens (0.00%)
+│  223. 2wz2Qh4yExB7LZ4zpFoyxYkNcpZmLNzSuAYYXSAP3FqL
+│                  3,251.73 tokens (0.00%)
+│  224. 8UVT8GuT42eSREDeRaR3ihf7mX9MV63LMS39LrPRG3QR
+│                  3,243.23 tokens (0.00%)
+│  225. C5YxFPNgB3k248QreA6X9u5kAMJwHaa6meekSuwnEejM
+│                  3,238.49 tokens (0.00%)
+│  226. GtFxpp2DqnxuujZGCrQJEEkG86crpebZKXe81VFq5WJt
+│                  3,233.69 tokens (0.00%)
+│  227. 5wv1vGZhod96YFzifUuKmXsrYXARt5EiFBkKdouJVRhs
+│                  3,223.72 tokens (0.00%)
+│  228. FQM8oMrfE836RNFbmsvniBbkGjVrjHePwepc4Zf6Ny9y
+│                  3,218.98 tokens (0.00%)
+│  229. 9AebiFa1FVqUcux49jKE1epsj6GknRUBsesRCYo3Y3ue
+│                  3,090.28 tokens (0.00%)
+│  230. CrWiUDHKHKcvQv9NNdSZhqUoJyCSEmNueA42oqXCXj53
+│                  3,019.28 tokens (0.00%)
+│  231. HizT6Sq4hLdgpGT6gTcq97WBNjpshbPugQecccTbiqHh
+│                  2,977.84 tokens (0.00%)
+│  232. 3n5kaXLSYNfWvX9CfzcsWcgBh5WpjBA4B5XvUQMkSnM5
+│                  2,954.48 tokens (0.00%)
+│  233. agjxvuLNfwUHLBFsKyM2Wuy7Jgs7T9TUKG1Z1WfKXAR
+│                  2,921.66 tokens (0.00%)
+│  234. G6YtiietkqVdab2tvXG1p2Mwb9SE5FspM1RUKHB84ViN
+│                  2,874.50 tokens (0.00%)
+│  235. 8syj5CYunR15YAANimcD98jyLgNxFogqGMq9Hvni1NFj
+│                  2,825.84 tokens (0.00%)
+│  236. BwXQRC4bWbrBAR7sQijWoZ6gAh5UyCnjBD159S7W18Up
+│                  2,792.52 tokens (0.00%)
+│  237. 9ibj7dvfHXhFRmXNL9rvVoA8ZPpxjZ7mhPfonVsenob5
+│                  2,778.47 tokens (0.00%)
+│  238. J9Ka6owHwqJhNe8KWqMzyKnZHi5onc5iCFJkmRg3HZtH
+│                  2,769.93 tokens (0.00%)
+│  239. 7PBoWxFybWVkL9AxxhQfpN5Fkr9Gr6m3fMrpf4vWzMR8
+│                  2,678.27 tokens (0.00%)
+│  240. 4if5nyTS9LBzvMdfZ77oXPLR2AzbPpRkMpd72c1PWNsE
+│                  2,406.20 tokens (0.00%)
+│  241. 4DWvzKmAbv2un4rE8iDVT2n5FWDUYWHj28ZVgsQbYm85
+│                  2,350.94 tokens (0.00%)
+│  242. EMWu3RCfaVPcQH7fGR5WcbRguiyTpugvzM23HQEEJBHh
+│                  2,313.46 tokens (0.00%)
+│  243. 294i8rFiYDBADVCF5Z8T1E89aj7Lo7DSsqCWvQMmd7UE
+│                  2,313.46 tokens (0.00%)
+│  244. 3unKLf597vzEFmpFGozRVu5d1zXGtxnZGrPF6fbP3tG5
+│                  2,295.51 tokens (0.00%)
+│  245. G2DftkZoTPJFtmeMtQaRbBQ7UvJvTVTJcc12EN8o8zWV
+│                  2,202.60 tokens (0.00%)
+│  246. 49LRMwB8HRiMPmTyrHsfPUTkoxxwhudL4ue2Rk3YT1sX
+│                  2,197.56 tokens (0.00%)
+│  247. 6Jak5y34VPDigSX7AFysL78NToW2dTUmkdmnV8qdyj2U
+│                  2,148.52 tokens (0.00%)
+│  248. Bpyzgeb9mBfxQqupAKsHVfthBzQkFcY6Qk4SpTNMcwui
+│                  2,121.64 tokens (0.00%)
+│  249. AXQZipkffgLkjbb8SAy23DC2Bnht4YnCQb6K2QLUi2BF
+│                  2,078.43 tokens (0.00%)
+│  250. 2mFjJ284cTH2xae11QLD41WeNi9cMtTGw1hYHqBRc2x3
+│                  1,951.64 tokens (0.00%)
+│  251. 3tA2eB17TRFkcUTVPBN3khGC3V64HnhkvDEFzio5XMuQ
+│                  1,911.01 tokens (0.00%)
+│  252. G4GyJ3wzqwmnzKXtA6vPP8dMPHCojqsiPYY1Kc4v4tZ2
+│                  1,884.39 tokens (0.00%)
+│  253. 8ASJJDMenLyszET42n3RMXD978JEL5fvfJhoArZGRqrT
+│                  1,876.92 tokens (0.00%)
+│  254. 5VKNsZQbZPYN7vUZwKxfEYycNf7ALGLchjLH9ksx6Qmf
+│                  1,759.78 tokens (0.00%)
+│  255. 6MYcDG7AdzpK7tqKU12rPHNPHtJxRMsxiNq6vkgELxKK
+│                  1,742.82 tokens (0.00%)
+│  256. GP87PfhnHLqr1eQd7dpbYpe6ocGHrwrxGeh58hjvnXeP
+│                  1,732.03 tokens (0.00%)
+│  257. CkQYjX6vtW4Ch2VMZ6xDmKKGLdoZB7LjLavY3VTGBJJH
+│                  1,689.43 tokens (0.00%)
+│  258. 5fK4Yj1pRKwzhUc9KMBGf97YsS7sr5ZqBpsCxR5x8MwB
+│                  1,636.77 tokens (0.00%)
+│  259. 9bLKJfg93VKKoWh8c5TpUQsKak2nJ6jyktSSiEg497bN
+│                  1,611.80 tokens (0.00%)
+│  260. 4dSoVNqefMsjnEJin947YBoDGjboZA3fHCu8qMuHaw4A
+│                  1,597.35 tokens (0.00%)
+│  261. DWwKQNzoQay1MXtMQWgYomYHrpgbu7LaumAZtRXQe2Xm
+│                  1,503.67 tokens (0.00%)
+│  262. 4NMhVA9itwVJYuVEWEzEHgwMbnAcg3pVRD5dCtWr6WGq
+│                  1,427.14 tokens (0.00%)
+│  263. AGB5Kqw3a6AoX91A66QcFX9ZZcJgHzqX1aeDLtWS9eYH
+│                  1,385.62 tokens (0.00%)
+│  264. A6mKte8dEJ1ewRXZFqWVp6NWpEe8EfBLFgAoEr9CGowK
+│                  1,385.62 tokens (0.00%)
+│  265. 9K7XcRG3NZtPDS7xeQv1aAux7uCjdEyzWTMDubwpfKZe
+│                  1,357.97 tokens (0.00%)
+│  266. BYJnbkcYNaxCFg9xiR8oFnedj28qLYpG9QStt1CtVLpn
+│                  1,254.86 tokens (0.00%)
+│  267. Db2jEoB4xGGEqVsLGLpdQqSN2C2kRLLNpgQ11VBuCd49
+│                  1,246.83 tokens (0.00%)
+│  268. J7AeW4dXSthP67znvYrQULxvNYshZKMpPo1MbE88PKH8
+│                  1,229.00 tokens (0.00%)
+│  269. 8xc2JsUiQRMGwygqcNRkFHLiNUhTf2U2ToX2pAXUnBv3
+│                  1,164.99 tokens (0.00%)
+│  270. 1rdkpo1Zzjk2iZoJZy99nVpvc6BWBdCZG7VvMzAGYY3
+│                  1,130.96 tokens (0.00%)
+│  271. G56Hso4JBaLhFnvVcBubWGaKK9Bdz6Zzd5wCsTe6bCp5
+│                  1,100.85 tokens (0.00%)
+│  272. DzH52g6P3EFZ1xon7oB2asS779bXjqqNPZn7pLrJV38s
+│                  1,090.94 tokens (0.00%)
+│  273. F9LfeyFeYw2JMXPsVWowjaB8FBsLvKGTRage79F9bEr6
+│                  1,082.28 tokens (0.00%)
+│  274. Bz1Pe9uZJik5ft7xFYhiJ5RqJPe21CFVw84xsxyRHPfE
+│                  1,080.83 tokens (0.00%)
+│  275. AZWyCkPSDyZSxMXwk4ZqGK6WZhfvykLU5D7WbKJuPMxn
+│                  1,077.84 tokens (0.00%)
+│  276. H3srkcraBb68DpiSBTpVBeK6SYvuniRUab3uLcVKwyZn
+│                  1,075.25 tokens (0.00%)
+│  277. 3LZJTWBYAuMpe2qiHnXknt7FnaGWezmGfs5W9qMMk7EA
+│                  1,042.74 tokens (0.00%)
+│  278. 7t6AS21uvofnoDnXzrqJuyzCSNVTgMg5UcxetynPKNen
+│                  1,041.44 tokens (0.00%)
+│  279. 5aAEmBhXNyQUkZXYd4gXr27SKZG4f2a1CFCtYWHHet4Q
+│                  1,039.23 tokens (0.00%)
+│  280. 6Hd4tvx5QHdzVzSrEomcmNkJU2pnu4dS7eZ2Q7zJupi7
+│                  1,039.22 tokens (0.00%)
+│  281. 7FfLVGwddcYQPapfVUemhqJLG4T6mTrZgY7DaASGmNw
+│                  1,039.22 tokens (0.00%)
+│  282. 59AaHUkyPJzw9s6jqHq64bbG6Ey8k8nZmLEK1Cct959J
+│                  1,039.22 tokens (0.00%)
+│  283. 7L5n2Xrk1Pg7e7kBZ7vj7PJSf2nMhN8GZ9j9CroGvJ2G
+│                    997.48 tokens (0.00%)
+│  284. 6moyu42nZMVmEzFGbqhTDKqyuit3pXQBkhFyvi4Xa82Y
+│                    979.31 tokens (0.00%)
+│  285. 9yiwLWnanWEQ46HsZfoYQrNg6LijHxKc5WpTjiFqoV67
+│                    949.50 tokens (0.00%)
+│  286. FrswRX8bDre7M63p1xuWaQrGgFKDsJv4mrnhKewafK9R
+│                    929.64 tokens (0.00%)
+│  287. 9EQbBeg83u1iYqFaueGVutSNvgbLqFXVQXmKCa9wgb1N
+│                    915.07 tokens (0.00%)
+│  288. 4XiEbw3277oeJumLjMcfZRmKsDMBQQGs4JUK9QTsDHso
+│                    872.39 tokens (0.00%)
+│  289. 4xuxWk7uUas7SbV8FqfDZz9rrhsnU7vBmPDVDSdTxrAT
+│                    870.58 tokens (0.00%)
+│  290. 131FGr36obSnrZwSp7AFNqdGixngJMbieoeqHg1b1qcd
+│                    860.84 tokens (0.00%)
+│  291. 5gL3cYUQywZmcnouvxfP5spZYB6LusFHbswaaP9btzSy
+│                    853.08 tokens (0.00%)
+│  292. 2wS4pyZdvKgh7xw1N1h5JaCVjFYdLv8bsoFzyU159ric
+│                    837.37 tokens (0.00%)
+│  293. 9evS2M3eM6iKsjqHHyiNddgVMhL4M89ycrQiSStzxycK
+│                    828.26 tokens (0.00%)
+│  294. 4LduK87Sd839h8Kcn54Pdv6pfWFasUqd1EFHvBKuTdod
+│                    825.28 tokens (0.00%)
+│  295. 74A3NPK1x2dbCr5u5RH3NXGMM9Vjec15ZfVmz1YSqW1P
+│                    821.56 tokens (0.00%)
+│  296. sfibG1FCBxEjKGnfyMXtg6Pvi1xaWa7vb289NCSic8P
+│                    800.00 tokens (0.00%)
+│  297. Cg7qPW7QsHwYGJuFdiLsDTNNh6RLJjAbNUXijN1wbSN3
+│                    775.77 tokens (0.00%)
+│  298. Cw7btZCFgk47pjq4bpdvZuS6euuJGhrk664K4FeRm8St
+│                    771.15 tokens (0.00%)
+│  299. 4raYg43HgwXZQZSMudEssPYGkdagDj3DZqVCdYtDmu6g
+│                    749.34 tokens (0.00%)
+│  300. 5oGuPJ8qVstEVAnWm1on5uE4pxrDARKJnY7keTSgU6HS
+│                    740.55 tokens (0.00%)
+│  301. 3mFYPAysDfgcfGkqyJY7iP2akqQwjEG36Ar7Q4nXThDu
+│                    715.75 tokens (0.00%)
+│  302. APCMwsJN4YEhCedWVA6iUcAMwp1VP2XVnvg5UjejsowZ
+│                    712.34 tokens (0.00%)
+│  303. ET3uECSSVrbzVPj2YBcZTNZosB6t1Te1ZErTwSSpdQw6
+│                    712.18 tokens (0.00%)
+│  304. 4uaSQkrT11Q7C9GVxyqRgVJzxXq2xhspASaYd7fSaKRq
+│                    705.20 tokens (0.00%)
+│  305. 2k4q5gK674SZGaQUDwXgnmjRyu8ft8SNaYJQDDDwQmiM
+│                    700.44 tokens (0.00%)
+│  306. 79s9M1HYNDE2wTnXYnqcB158ipgZHHTHox9WdtGHSAKv
+│                    698.90 tokens (0.00%)
+│  307. BysmAmy3DUeG816bFiB7ZrDS19PXf2TvVk1tX5YXS5G
+│                    692.81 tokens (0.00%)
+│  308. 3gxCvfgq17F5ojh6gfVFESyG8QdTmiovrrqmzM7ryo7w
+│                    692.81 tokens (0.00%)
+│  309. 7ymejtnn3g2YnL7QpSWsVfsDzqAhsPA73KNKN79JWj38
+│                    692.81 tokens (0.00%)
+│  310. CQXM1NHLy3Gm2tXN2N2X8xheGxDaFMnAhcMsE79LbHd1
+│                    659.56 tokens (0.00%)
+│  311. GCLhxPfmx2189YqHy8dWVVffm1tvarrvv7moU1ytmQjB
+│                    656.64 tokens (0.00%)
+│  312. 4Auiwy3sHj2T6Wx649dzQHfVdhiD5y6NKLBK4kVV5Ass
+│                    654.84 tokens (0.00%)
+│  313. 99yAF2JG88mHnkChW2SRby4K5SUBPwuzpo5LmUdj3jF1
+│                    644.94 tokens (0.00%)
+│  314. CtH9ie8mDYbdvJL4ir1nzG2xhyNKjf3PcuiMdt3Mu7q5
+│                    611.59 tokens (0.00%)
+│  315. EPQ9U3vvRHgrRKi8ZGGyWo5Ni5uvesnVVAAAs892TMzq
+│                    594.97 tokens (0.00%)
+│  316. 9vzQBJNYuZecTSvxc8eQJqCmDzPR35WuQsiqs3JS28uG
+│                    583.99 tokens (0.00%)
+│  317. 8kPkcThwjDp324kWjL64XCZ1h7iXt2EsMQ59e2PgUwPE
+│                    573.70 tokens (0.00%)
+│  318. gm6KR1LzcpVeKxN9Pe1NDwvtan9dmKaNZ5xxsMokdrP
+│                    573.13 tokens (0.00%)
+│  319. DzvfntmtcsBpv7zGqdZf5XdnsiQ1my3xCc7UqSXPYUAf
+│                    567.27 tokens (0.00%)
+│  320. 6JKqn99gBh7JibPy4gehsxsrxESAydjMd6HKMpBR3MrA
+│                    565.40 tokens (0.00%)
+│  321. HYX2a7WpabSTB5d6VwvmF9oz3upcv8rpNjbrbbeLhkeK
+│                    558.82 tokens (0.00%)
+│  322. Gh6qh8kywtH2woMya4LxVVGKTpi1JffshSeXNhDdYVN7
+│                    549.08 tokens (0.00%)
+│  323. dCaekApye51Eojg7wozUdKY5fgsPzk2jC4EXdPteVg8
+│                    536.80 tokens (0.00%)
+│  324. BtvGL8FVSc755QmyBiKPYyxSBg7wFC4AEXkrphM7iqUX
+│                    524.81 tokens (0.00%)
+│  325. CZQb7MQuXFmQJv3xU6mrdM7Vaef3ahHcXrGTVniF1ruE
+│                    519.61 tokens (0.00%)
+│  326. EifEbomKzkvtGr3ZLCgXaNVAbV6WzXPDjqmNgLAgWTj
+│                    504.04 tokens (0.00%)
+│  327. 9Myr7tkbFf7twQgKzc5QRJsP7xG6zNP6crQ8LPxiLvHf
+│                    503.65 tokens (0.00%)
+│  328. 59EcLTbM3rYjhkiBjsxV3w9hTd68aRNizJxVNN9DxdQP
+│                    472.42 tokens (0.00%)
+│  329. BoCQp1JKLypkXgoU4RhbAP675hEh1Fb21CErPdneACFK
+│                    462.05 tokens (0.00%)
+│  330. HndKtxa9AnJ4ugsdDoG39Bu6V5Z3mkxD9WMwP5h9f4oW
+│                    450.33 tokens (0.00%)
+│  331. 5ozALjsycbQqQcQXDqgp32qia24TxrozS5HuX4NA4Qrn
+│                    449.96 tokens (0.00%)
+│  332. DWoqWddMgCCmVEiU5GFf59TwceyM8sQvffLbe8Dr5BVQ
+│                    436.92 tokens (0.00%)
+│  333. HoterGiKgTg7ZuocT6JqqUuEA2wELEjW43DeyBX57pXN
+│                    422.62 tokens (0.00%)
+│  334. F2XiGwBmzjmM3C9apaK8hrD3SfyC3xpeQQGEN6AmGt2r
+│                    414.83 tokens (0.00%)
+│  335. CazhuxC1gTTyCQsMLBui6gkvXzajhtVFDxpN8nSKBxyy
+│                    387.51 tokens (0.00%)
+│  336. 3eJrQwrKPPxscUemSr366f2ZkHEB872YFh2meyADFVSu
+│                    387.50 tokens (0.00%)
+│  337. 2sos6ScqByPUSQNGwEXTmQw4QQTeju7kfy35PZCMPxsA
+│                    379.16 tokens (0.00%)
+│  338. 8fj3ApFZmGSArWyBiLLaboPfSHqNxAk5q3yj4BZvmJ7V
+│                    376.79 tokens (0.00%)
+│  339. 43L9f7ChWsuEVNZjEQ7R1MSAFLTPKVeRE9nm5TGTToar
+│                    367.85 tokens (0.00%)
+│  340. 6v53XejFBQhNZTD2qrd5VDwhki93P4p2JfHpuFPxiVyX
+│                    365.19 tokens (0.00%)
+│  341. 4EsvooF4EtqBz7RoStFapAZ3p5ayQcxwQVdHC8NrAvBY
+│                    363.61 tokens (0.00%)
+│  342. DxdpprtmMSiG9pWBfrKyrNT5dM9A2uSg6NykwPrJdFDM
+│                    355.45 tokens (0.00%)
+│  343. 4t8PdeTuyBe5PK2DrzYbuteWPqi7DKPFQiDuc2jYBQJ2
+│                    354.79 tokens (0.00%)
+│  344. 7S8qJf5Kpxo2eCCZX5gQNgpyvV5mQVaw2uv77xrW6EyF
+│                    350.76 tokens (0.00%)
+│  345. D7MpB5zTaoZhzqHZu45HhvPyr1ZjMvXrPNx6zahf9qzp
+│                    350.65 tokens (0.00%)
+│  346. 6DCA9KY9um4fziqSWabX9n46m8asArzwyuiLwof7rvDX
+│                    346.41 tokens (0.00%)
+│  347. Fzy2va11HWV4qk5SCx29xdazVxEwKr19aW2TjHyKdfZa
+│                    346.41 tokens (0.00%)
+│  348. 52JnG6LppQRne4esdbViWtvkgfmk8gBvcPy5yguhqrNJ
+│                    346.41 tokens (0.00%)
+│  349. 6Zo7uaFXeTwvhFdHnoAi4ft9EXmKnpbNn5j6sP3yB6KL
+│                    346.41 tokens (0.00%)
+│  350. Hf5miRL5e3Q3hGbjkc5sihoqbysYLAMGWY1z86Mk7G6g
+│                    343.81 tokens (0.00%)
+│  351. Hz4jMj77Jdz7uPX7pfBgZvtijwiiS34BbJZJVMPPgi9c
+│                    339.64 tokens (0.00%)
+│  352. 9rowDd47ofHZvZvsACXNq16tPq5drBic5bMEZQBuo2PD
+│                    339.43 tokens (0.00%)
+│  353. FsY4WEDEuLbdg2rXnbDPGVKpXvx4rMAvkuTpnFdDRUmH
+│                    336.39 tokens (0.00%)
+│  354. 3o7pXSVEWEEfeSZJ7sPE6eQYQpKzijZesXwUebKH9vbi
+│                    333.81 tokens (0.00%)
+│  355. DEPK2Wo2kq6b5RxihN1ytcQP6Jd74drkzcKWMkdm9E9e
+│                    328.04 tokens (0.00%)
+│  356. 38xjurbTtjfkrvy4SmJUZneMDeX7LMC2wRPyWSvrSiET
+│                    317.92 tokens (0.00%)
+│  357. 8rSqPfXZLfkmP9DpjqikQhXtADmzFhfa83FZ7CAVmvCV
+│                    310.64 tokens (0.00%)
+│  358. aLJnbhGVgr8ifM5CRGD2JRp93Vheyy9ekn5SwhDPc3Y
+│                    303.54 tokens (0.00%)
+│  359. HxvLuLQkuLXXDnGp7vSNUgw5cV8YNvLjaSP6pu2Boy1t
+│                    303.50 tokens (0.00%)
+│  360. 8VTPKJYUYLY7nHz9MMCB78dHzrtZtatSBfZDPf7eMzQv
+│                    302.80 tokens (0.00%)
+│  361. 5nFVtrhHXyaMBFHhXFYfLmNfbgUWuToy2q4LDpRrWU7N
+│                    300.84 tokens (0.00%)
+│  362. HrZahdVPHG888mbnwH6c555NpDwGXYkoGZKxqkBkUpt5
+│                    298.26 tokens (0.00%)
+│  363. AnGfkX5Y1EnxT2htZCgY8g9Nxmoc8UYku68iT7RHARwr
+│                    297.50 tokens (0.00%)
+│  364. Db3pCbDUvNyb6yqMmQRtxbvgENoqU8WMugmkDZVv1huH
+│                    296.62 tokens (0.00%)
+│  365. CYr1rVvqEb8njaZHdYxHo7cbHPN2RtqY3sXbXZuoZJrH
+│                    296.32 tokens (0.00%)
+│  366. CG973BQKNnvDdZTYajmEsbDNpRcdJ6rJFhBiKzYgN4HE
+│                    296.25 tokens (0.00%)
+│  367. BhcSJ9DJR4WtE9ezLiegMMavdqGJ692S7pMsB8WsLE6x
+│                    292.25 tokens (0.00%)
+│  368. GUXZhC9yPPNiH5sSczVYoM35LUPakaKddYYVeZJ8Y4H3
+│                    283.91 tokens (0.00%)
+│  369. HMsMFJ8oXmgizHsnnYJY6hPvSSWaDJvrvk7BhbTURCYs
+│                    283.87 tokens (0.00%)
+│  370. AYfu52Fae26zNUtWdY5jykELN16BKMVmCgGzvfntPyPo
+│                    282.77 tokens (0.00%)
+│  371. 5U9uVuBBGeh2xYUcqRro1SKjrQqY6tDuYKJSm9USmR2G
+│                    277.12 tokens (0.00%)
+│  372. 9YL5fz2BcBuuU511RZ2cw8nPz3ayW25T2ZwzTSgWfXKf
+│                    277.12 tokens (0.00%)
+│  373. GTYtdoQ6n58JGVs3ZXPFPCQBBuwcSaSqFoeu98KW9pnW
+│                    273.14 tokens (0.00%)
+│  374. ABDMtjCyPEuftE6sQfqZUHeJomzzbmVYVftC9Y9C1oTL
+│                    272.88 tokens (0.00%)
+│  375. 8bPjACqgWByytPnti3nAU8U9SPCVT4jKuqVKwPz5jZWZ
+│                    272.66 tokens (0.00%)
+│  376. Gym2e8xtPXatkgz2wKkfa4a5Nrvd1Ds2683Pj8o6GDdP
+│                    267.46 tokens (0.00%)
+│  377. 36eHWRFMWuVUY8FgxyowbQV2eStVRVg3nSVBXCfpcoDM
+│                    266.63 tokens (0.00%)
+│  378. 2D17ktA9S8rMbHkAGuCjAQZS71iADZs34NwMiz5Q3jY6
+│                    265.47 tokens (0.00%)
+│  379. 2ErQgTKHfpxHUXUxxCwSLMAe8k2EjoX8os5PC8DtYdQF
+│                    264.31 tokens (0.00%)
+│  380. HY6mymkDKWpGbVNC8vzdcSHvncyYmxQRiLhdAYGFLpm6
+│                    259.27 tokens (0.00%)
+│  381. 3cGFB2PBhN66Ak5Tvq3WTnX45zVMTvj5NrodZqiEPCLG
+│                    258.07 tokens (0.00%)
+│  382. BKNhhg2fBwsDdXbqvUsVf5y7zEsCgFMXvaLy6Jfa9PpM
+│                    257.98 tokens (0.00%)
+│  383. EGTsm2XbbhHHp64i2DLWmT8tH7JA7aKiPfipeTxgSTnt
+│                    254.02 tokens (0.00%)
+│  384. 4Yw6cKqYPdfq9RDwB3c7FgaMnv2dpME6Ydn6Ec8vyLQB
+│                    253.48 tokens (0.00%)
+│  385. w65LFFuMRC7U9h1ierU5eWbpiptTa2VdRor4gxyUWxD
+│                    251.49 tokens (0.00%)
+│  386. 5xGvQTsVYQdZJCEGAdmj3aBxGjM4ZiqTwFQ51fedEmpY
+│                    250.95 tokens (0.00%)
+│  387. AbDm3qTHxDvi4Ro9Cjwks4UgJY3tTJB266TpuBy3vxu2
+│                    247.01 tokens (0.00%)
+│  388. 2sYNhdmmYtLJKsNuytrJspKwhj5MH6RVpZbArt9PcYPi
+│                    242.30 tokens (0.00%)
+└─────────────────────────────────────────────────────────────────┘
+
+┌─ SNAPSHOTS ─────────────────────────────────────────────────────┐
+│  Taken:     1 / 1
+│  ✅ All snapshots up to date
+│
+│  Recent Snapshots:
+│    Day  0:        66,258,450.80 tokens staked
+└─────────────────────────────────────────────────────────────────┘
+
+┌─ REWARDS ───────────────────────────────────────────────────────┐
+│  Total Pool:        133,000,000.00 tokens
+│  Distributable:     1,127,762.58 (days 1-1)
+│
+│  Daily Rewards (first 5 and last 5 days):
+│    Day  1:       1,127,762.58 ✅
+│    Day  2:       1,310,273.18 ⏳
+│    Day  3:       1,522,320.25 ⏳
+│    Day  4:       1,768,683.79 ⏳
+│    Day  5:       2,054,917.39 ⏳
+│    ...
+│    Day 16:      10,699,913.41 ⏳
+│    Day 17:      12,431,525.79 ⏳
+│    Day 18:      14,443,372.35 ⏳
+│    Day 19:      16,780,804.58 ⏳
+│    Day 20:      19,496,513.38 ⏳
+└─────────────────────────────────────────────────────────────────┘
+
+┌─ TREASURY ──────────────────────────────────────────────────────┐
+│  Pool Token Balance:     161,409,227.34 tokens
+│  ├─ Virtual staked:     66,017,294.55 tokens (no real obligation)
+│  ├─ Unclaimed airdrop:  28,413,331.98 tokens
+│  └─ Staking rewards:    133,000,000.00 tokens (max)
+└─────────────────────────────────────────────────────────────────┘
+
+══════════════════════════════════════════════════════════════════════
+   Generated: Wed, 18 Feb 2026 14:31:00 GMT
+══════════════════════════════════════════════════════════════════════

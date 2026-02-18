@@ -72,11 +72,11 @@ interface PoolData {
 
 function parsePoolState(data: Buffer): PoolData {
   const admin = new PublicKey(data.slice(8, 8 + 32));
-  const startTime = Number(data.readBigInt64LE(8 + 32 + 32 + 32 + 32));
-  const totalStaked = data.readBigUInt64LE(8 + 32 + 32 + 32 + 32 + 8);
-  const snapshotCount = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8);
+  const startTime = Number(data.readBigInt64LE(8 + 32 + 32 + 32 + 32 + 8));
+  const totalStaked = data.readBigUInt64LE(8 + 32 + 32 + 32 + 32 + 8 + 8);
+  const snapshotCount = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 8);
   // skip bump (1) + pool_token_bump (1)
-  const paused = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 1 + 1 + 1);
+  const paused = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 8 + 1 + 1 + 1);
 
   return { admin, startTime, totalStaked, snapshotCount, paused };
 }
