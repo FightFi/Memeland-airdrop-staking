@@ -13,7 +13,7 @@
  *
  * Required env vars:
  *   ANCHOR_PROVIDER_URL  — RPC endpoint
- *   ANCHOR_WALLET        — path to admin keypair JSON
+ *   ADMIN_KEYPAIR        — path to admin keypair JSON
  *   PROGRAM_ID           — deployed program ID
  *   TOKEN_MINT           — $FIGHT token mint address
  *   MERKLE_JSON          — path to merkle tree JSON
@@ -90,7 +90,8 @@ function parsePoolState(data: Buffer): PoolData {
   const merkleRoot = Array.from(data.slice(offset, offset + 32));
   offset += 32;
 
-  offset += 8; // allowlist_total_raw (skip)
+  // allowlist_total_raw: u64 (added in audit)
+  offset += 8;
 
   const startTime = Number(data.readBigInt64LE(offset));
   offset += 8;
@@ -232,6 +233,7 @@ async function main() {
 
   // Calculate time-based metrics
   const elapsedSeconds = Math.max(0, now - pool.startTime);
+  console.log(pool.startTime, now)
   const currentDay = pool.startTime > now ? 0 : Math.floor(elapsedSeconds / SECONDS_PER_DAY);
   const daysRemaining = Math.max(0, TOTAL_DAYS - currentDay + 1);
   const isExpired = currentDay >= CLAIM_WINDOW_DAYS;

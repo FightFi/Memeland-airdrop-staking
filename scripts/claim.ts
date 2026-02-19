@@ -5,7 +5,7 @@
  * Looks up the wallet in the merkle JSON and submits the claim transaction.
  *
  * Usage:
- *   yarn claim:devnet                           # Claim using ANCHOR_WALLET
+ *   yarn claim:devnet                           # Claim using ADMIN_KEYPAIR
  *   yarn claim:devnet --wallet <path>           # Claim using specific keypair
  *   yarn claim:devnet --check                   # Only check eligibility, don't claim
  *   yarn claim:devnet --check --address <pubkey> # Check eligibility for any address
@@ -13,7 +13,7 @@
  *
  * Required env vars:
  *   ANCHOR_PROVIDER_URL  — RPC endpoint
- *   ANCHOR_WALLET        — path to user keypair JSON (default wallet)
+ *   ADMIN_KEYPAIR        — path to user keypair JSON (default wallet)
  *   PROGRAM_ID           — deployed program ID
  *   TOKEN_MINT           — $FIGHT token mint address
  *   MERKLE_JSON          — path to merkle tree JSON
@@ -97,7 +97,7 @@ async function main() {
   const { walletPath: argWalletPath, checkOnly, address: checkAddress, skipConfirm } = parseArgs();
 
   const rpcUrl = requireEnv("ANCHOR_PROVIDER_URL");
-  const defaultWalletPath = requireEnv("ANCHOR_WALLET");
+  const defaultWalletPath = requireEnv("ADMIN_KEYPAIR");
   const programIdStr = requireEnv("PROGRAM_ID");
   const tokenMintStr = requireEnv("TOKEN_MINT");
   const merkleJsonPath = requireEnv("MERKLE_JSON");
@@ -226,7 +226,7 @@ async function main() {
   }
 
   if (!userKeypair) {
-    console.error("\n❌ Cannot claim: no keypair loaded (use --wallet or set ANCHOR_WALLET)");
+    console.error("\n❌ Cannot claim: no keypair loaded (use --wallet or set ADMIN_KEYPAIR)");
     process.exit(1);
   }
 
@@ -299,8 +299,8 @@ async function main() {
       console.error("\n❌ Failed: Invalid merkle proof.");
     } else if (errMsg.includes("AirdropPoolExhausted")) {
       console.error("\n❌ Failed: Airdrop pool exhausted (67M limit reached).");
-    } else if (errMsg.includes("StakingPeriodEnded")) {
-      console.error("\n❌ Failed: Staking period has ended — claims no longer accepted.");
+    } else if (errMsg.includes("ClaimWindowEnded")) {
+      console.error("\n❌ Failed: Claim window has ended — claims no longer accepted.");
     } else if (errMsg.includes("already in use")) {
       console.error("\n❌ Failed: Already claimed (ClaimMarker exists).");
     } else {

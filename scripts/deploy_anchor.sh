@@ -38,8 +38,14 @@ solana config set --keypair $KEYPAIR
 solana config set --url $CLUSTER
 
 # ----- ANCHOR DEPLOY -----
+# Anchor expects "mainnet" not "mainnet-beta"
+ANCHOR_CLUSTER=$CLUSTER
+if [ "$CLUSTER" = "mainnet-beta" ]; then
+    ANCHOR_CLUSTER="mainnet"
+fi
+
 echo "🚀 Deploying Anchor program..."
-ANCHOR_WALLET=$KEYPAIR anchor deploy --program-name memeland_airdrop --provider.cluster $CLUSTER --provider.wallet $KEYPAIR --program-keypair $PROGRAM_KEYPAIR
+ADMIN_KEYPAIR=$KEYPAIR anchor deploy --program-name memeland_airdrop --provider.cluster $ANCHOR_CLUSTER --provider.wallet $KEYPAIR --program-keypair $PROGRAM_KEYPAIR
 
 # ----- FINAL INFO -----
 PROGRAM_ID=$(anchor keys list | grep "Program Id:" | awk '{print $3}')

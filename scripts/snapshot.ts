@@ -10,7 +10,7 @@
  *
  * Required env vars:
  *   ANCHOR_PROVIDER_URL  — RPC endpoint
- *   ANCHOR_WALLET        — path to admin keypair JSON
+ *   ADMIN_KEYPAIR        — path to admin keypair JSON
  *   PROGRAM_ID           — deployed program ID
  *   TOKEN_MINT           — $FIGHT token mint address
  */
@@ -43,7 +43,7 @@ async function main() {
   const force = args.includes("--force");
 
   const rpcUrl = requireEnv("ANCHOR_PROVIDER_URL");
-  const walletPath = requireEnv("ANCHOR_WALLET");
+  const walletPath = requireEnv("ADMIN_KEYPAIR");
   const programIdStr = requireEnv("PROGRAM_ID");
   const tokenMintStr = requireEnv("TOKEN_MINT");
 
@@ -85,8 +85,8 @@ async function main() {
 
     // Quick parse for display
     const data = poolAccount.data;
-    const startTime = Number(data.readBigInt64LE(8 + 32 + 32 + 32 + 32 + 8));
-    const snapshotCount = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 8);
+    const startTime = Number(data.readBigInt64LE(8 + 32 + 32 + 32 + 32 + 8)); // +8 for allowlist_total_raw
+    const snapshotCount = data.readUInt8(8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 8); // +8 for allowlist_total_raw
     const currentDay = getCurrentDay(startTime, now);
 
     console.log("=".repeat(60));

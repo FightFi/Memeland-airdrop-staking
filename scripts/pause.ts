@@ -13,7 +13,7 @@
  *
  * Required env vars:
  *   ANCHOR_PROVIDER_URL  — RPC endpoint
- *   ANCHOR_WALLET        — path to admin keypair JSON
+ *   ADMIN_KEYPAIR        — path to admin keypair JSON
  *   PROGRAM_ID           — deployed program ID
  *   TOKEN_MINT           — $FIGHT token mint address
  */
@@ -99,7 +99,7 @@ async function main() {
   const { action, skipConfirm } = parseArgs();
 
   const rpcUrl = requireEnv("ANCHOR_PROVIDER_URL");
-  const walletPath = requireEnv("ANCHOR_WALLET");
+  const walletPath = requireEnv("ADMIN_KEYPAIR");
   const programIdStr = requireEnv("PROGRAM_ID");
   const tokenMintStr = requireEnv("TOKEN_MINT");
 

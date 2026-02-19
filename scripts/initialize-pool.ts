@@ -9,7 +9,7 @@
  *
  * Required env vars:
  *   ANCHOR_PROVIDER_URL  — RPC endpoint
- *   ANCHOR_WALLET        — path to admin keypair JSON
+ *   ADMIN_KEYPAIR        — path to admin keypair JSON
  *   PROGRAM_ID           — deployed program ID
  *   TOKEN_MINT           — $FIGHT token mint address
  *   MERKLE_JSON          — path to merkle tree JSON (from build-merkle)
@@ -19,7 +19,7 @@
  *
  * What this script does:
  *   1. Reads merkle root from the merkle JSON file
- *   2. Calls initialize_pool(start_time, merkle_root, daily_rewards)
+ *   2. Calls initialize_pool(start_time, merkle_root, allowlist_total_raw, daily_rewards)
  *   3. Transfers 200M tokens from admin ATA to the pool token account
  */
 
@@ -60,7 +60,7 @@ const TOTAL_SUPPLY = BigInt("200000000000000000"); // 200M with 9 decimals
 async function main() {
   // Load env
   const rpcUrl = requireEnv("ANCHOR_PROVIDER_URL");
-  const walletPath = requireEnv("ANCHOR_WALLET");
+  const walletPath = requireEnv("ADMIN_KEYPAIR");
   const programIdStr = requireEnv("PROGRAM_ID");
   const tokenMintStr = requireEnv("TOKEN_MINT");
   const merkleJsonPath = requireEnv("MERKLE_JSON");
@@ -213,7 +213,7 @@ async function main() {
     process.exit(0);
   }
   const tx = await program.methods
-    .initializePool(new BN(startTime), merkleRoot, dailyRewards)
+    .initializePool(new BN(startTime), merkleRoot, new BN("67000000000000000"), dailyRewards)
     .accounts({
       admin: admin.publicKey,
       poolState,
