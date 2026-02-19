@@ -21,7 +21,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { Connection, PublicKey, GetProgramAccountsFilter } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { getAccount } from "@solana/spl-token";
 
 // Constants matching the program
@@ -233,7 +233,6 @@ async function main() {
 
   // Calculate time-based metrics
   const elapsedSeconds = Math.max(0, now - pool.startTime);
-  console.log(pool.startTime, now)
   const currentDay = pool.startTime > now ? 0 : Math.floor(elapsedSeconds / SECONDS_PER_DAY);
   const daysRemaining = Math.max(0, TOTAL_DAYS - currentDay + 1);
   const isExpired = currentDay >= CLAIM_WINDOW_DAYS;
@@ -250,30 +249,11 @@ async function main() {
   }
 
   // Fetch all ClaimMarker accounts (people who claimed)
-  const claimMarkerFilters: GetProgramAccountsFilter[] = [
-    { dataSize: 8 + 1 }, // discriminator + bump
-    { memcmp: { offset: 0, bytes: "" } }, // We'll filter by program
-  ];
-
-  // Get all accounts owned by the program with ClaimMarker size
   const claimMarkerAccounts = await connection.getProgramAccounts(programId, {
-    filters: [{ dataSize: 8 + 1 }], // ClaimMarker size
+    filters: [{ dataSize: 8 + 1 }], // ClaimMarker size: discriminator + bump
   });
 
-  // Filter to only include markers for this pool
-  let claimedCount = 0;
-  for (const account of claimMarkerAccounts) {
-    // ClaimMarker PDA: ["claimed", pool_state, user]
-    // We verify by checking if the account is derived from our pool
-    const [expectedPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("claimed"), poolState.toBuffer(), account.account.data.slice(0, 0)], // Can't easily verify without iterating
-      programId
-    );
-    // Since we can't easily filter, we count all markers as approximate
-    claimedCount++;
-  }
-
-  // More accurate: count by fetching UserStake accounts
+  // Fetch UserStake accounts (active stakers)
   const userStakeAccounts = await connection.getProgramAccounts(programId, {
     filters: [{ dataSize: 8 + 32 + 8 + 1 }], // UserStake size: discriminator + owner + staked_amount + bump
   });
@@ -320,34 +300,11 @@ async function main() {
     }
   }
 
-  // Estimate unstaked users (claimed - active stakers)
-  // This is approximate since ClaimMarkers persist
-  const estimatedUnstaked = Math.max(0, claimMarkerAccounts.length - activeStakers);
-
-  // Calculate rewards paid out to unstakers from actual staking data:
-  // 1. Sum total rewards distributed across all snapshotted days
-  // 2. Subtract pending rewards for active stakers (their share still in the pool)
-  // This avoids relying on a hardcoded initial funding amount.
-  let totalRewardsDistributed = 0n;
-  for (let d = 0; d < pool.snapshotCount && d < TOTAL_DAYS; d++) {
-    totalRewardsDistributed += pool.dailyRewards[d];
-  }
-
-  let pendingRewardsForActiveStakers = 0n;
-  for (const stake of stakes) {
-    for (let d = 0; d < pool.snapshotCount && d < TOTAL_DAYS; d++) {
-      const snapshotTotal = pool.dailySnapshots[d];
-      if (snapshotTotal === 0n) continue;
-      const daily = pool.dailyRewards[d];
-      // Use 128-bit math to avoid overflow
-      const userShare = (BigInt(stake.stakedAmount) * BigInt(daily)) / BigInt(snapshotTotal);
-      pendingRewardsForActiveStakers += userShare;
-    }
-  }
-
-  const totalRewardsPaid = totalRewardsDistributed > pendingRewardsForActiveStakers
-    ? totalRewardsDistributed - pendingRewardsForActiveStakers
-    : 0n;
+  // Treasury: exact token flow calculation
+  // Airdrop tokens leave the pool on claim. Rewards leave on unstake.
+  // totalOut = initial funding - current balance (exact, from on-chain token account)
+  const totalOut = TOTAL_POOL - poolTokenBalance;
+  const rewardsPaid = totalOut - pool.totalAirdropClaimed;
 
   // Calculate claim statistics
   const airdropRemaining = AIRDROP_POOL - pool.totalAirdropClaimed;
@@ -392,12 +349,12 @@ async function main() {
     },
     staking: {
       activeStakers,
-      estimatedUnstaked,
-      totalStaked: formatTokens(pool.totalStaked),
-      totalStakedRaw: pool.totalStaked.toString(),
-      totalRewardsPaid: formatTokens(totalRewardsPaid),
-      totalRewardsPaidRaw: totalRewardsPaid.toString(),
-      averageStake: activeStakers > 0 ? formatTokens(pool.totalStaked / BigInt(activeStakers)) : "0",
+      unstaked: pool.totalUnstaked,
+      totalStaked: formatTokens(totalStakedVerified),
+      totalStakedRaw: totalStakedVerified.toString(),
+      rewardsPaid: formatTokens(rewardsPaid),
+      rewardsPaidRaw: rewardsPaid.toString(),
+      averageStake: activeStakers > 0 ? formatTokens(totalStakedVerified / BigInt(activeStakers)) : "0",
       largestStake: formatTokens(largestStake),
       smallestStake: formatTokens(smallestStake),
       stakingPoolSize: formatTokens(STAKING_POOL),
@@ -408,7 +365,7 @@ async function main() {
         owner: s.owner.toBase58(),
         amount: formatTokens(s.stakedAmount),
         amountRaw: s.stakedAmount.toString(),
-        share: formatPercent(s.stakedAmount, pool.totalStaked),
+        share: formatPercent(s.stakedAmount, totalStakedVerified),
       })),
     snapshots: {
       count: pool.snapshotCount,
@@ -430,11 +387,17 @@ async function main() {
       })),
     },
     treasury: {
-      poolTokenBalance: formatTokens(poolTokenBalance),
-      poolTokenBalanceRaw: poolTokenBalance.toString(),
-      virtualStaked: formatTokens(pool.totalStaked),
+      initialFunding: formatTokens(TOTAL_POOL),
+      currentBalance: formatTokens(poolTokenBalance),
+      currentBalanceRaw: poolTokenBalance.toString(),
+      totalOut: formatTokens(TOTAL_POOL - poolTokenBalance),
+      totalOutRaw: (TOTAL_POOL - poolTokenBalance).toString(),
+      airdropClaimed: formatTokens(pool.totalAirdropClaimed),
+      airdropClaimedRaw: pool.totalAirdropClaimed.toString(),
+      rewardsPaid: formatTokens(rewardsPaid),
+      rewardsPaidRaw: rewardsPaid.toString(),
       unclaimedAirdrop: merkleData ? formatTokens(eligibleAmount - pool.totalAirdropClaimed) : "N/A (no merkle data)",
-      stakingRewardsMax: formatTokens(STAKING_POOL),
+      remainingRewards: formatTokens(STAKING_POOL - rewardsPaid),
     },
   };
 
@@ -506,15 +469,31 @@ async function main() {
 
   // Staking
   log("\n┌─ STAKING ───────────────────────────────────────────────────────┐");
-  log(`│  Active Stakers:   ${pool.activeStakers.toLocaleString()} (on-chain)`);
-  log(`│  Unstaked:         ${pool.totalUnstaked.toLocaleString()} users (on-chain)`);
-  log(`│  Rewards Paid:     ${formatTokens(totalRewardsPaid)} tokens`);
-  log(`│  Total Staked:     ${formatTokens(pool.totalStaked)} tokens`);
-  if (pool.activeStakers > 0) {
-    log(`│  Average Stake:    ${formatTokens(pool.totalStaked / BigInt(pool.activeStakers))} tokens`);
+  log(`│  Active Stakers:   ${activeStakers.toLocaleString()}`);
+  log(`│  Unstaked:         ${pool.totalUnstaked.toLocaleString()} users`);
+  log(`│  Total Staked:     ${formatTokens(totalStakedVerified)} tokens`);
+  if (activeStakers > 0) {
+    log(`│  Average Stake:    ${formatTokens(totalStakedVerified / BigInt(activeStakers))} tokens`);
     log(`│  Largest Stake:    ${formatTokens(largestStake)} tokens`);
     log(`│  Smallest Stake:   ${formatTokens(smallestStake)} tokens`);
   }
+  log("└─────────────────────────────────────────────────────────────────┘");
+
+  // Treasury
+  log("\n┌─ TREASURY ──────────────────────────────────────────────────────┐");
+  log(`│  Initial Funding:        ${formatTokens(TOTAL_POOL)} tokens`);
+  log(`│  Current Balance:        ${formatTokens(poolTokenBalance)} tokens`);
+  log(`│  ──────────────────────────────────────────────────────────────`);
+  log(`│  Total Out:              ${formatTokens(totalOut)} tokens`);
+  log(`│  ├─ Airdrop claimed:     ${formatTokens(pool.totalAirdropClaimed)} tokens (${claimMarkerAccounts.length} claimers)`);
+  log(`│  └─ Rewards paid:        ${formatTokens(rewardsPaid)} tokens (${pool.totalUnstaked} unstakers)`);
+  log(`│  ──────────────────────────────────────────────────────────────`);
+  log(`│  Pending in contract:`);
+  if (merkleData) {
+    const unclaimedAirdrop = eligibleAmount - pool.totalAirdropClaimed;
+    log(`│  ├─ Unclaimed airdrop:   ${formatTokens(unclaimedAirdrop)} tokens (${eligibleWallets - claimMarkerAccounts.length} wallets)`);
+  }
+  log(`│  └─ Remaining rewards:   ${formatTokens(STAKING_POOL - rewardsPaid)} tokens`);
   log("└─────────────────────────────────────────────────────────────────┘");
 
   // Individual Stakes
@@ -523,7 +502,7 @@ async function main() {
     log("\n┌─ STAKERS ───────────────────────────────────────────────────────┐");
     for (let i = 0; i < sorted.length; i++) {
       const s = sorted[i];
-      const pct = formatPercent(s.stakedAmount, pool.totalStaked);
+      const pct = formatPercent(s.stakedAmount, totalStakedVerified);
       log(`│  ${(i + 1).toString().padStart(2)}. ${s.owner.toBase58()}`);
       log(`│      ${formatTokens(s.stakedAmount).padStart(20)} tokens (${pct})`);
     }
@@ -568,17 +547,6 @@ async function main() {
     const emoji = i < currentDay ? "✅" : "⏳";
     log(`│    Day ${(i + 1).toString().padStart(2)}: ${formatTokens(pool.dailyRewards[i]).padStart(18)} ${emoji}`);
   }
-  log("└─────────────────────────────────────────────────────────────────┘");
-
-  // Treasury
-  log("\n┌─ TREASURY ──────────────────────────────────────────────────────┐");
-  log(`│  Pool Token Balance:     ${formatTokens(poolTokenBalance)} tokens`);
-  log(`│  ├─ Virtual staked:     ${formatTokens(pool.totalStaked)} tokens (no real obligation)`);
-  if (merkleData) {
-    const unclaimedAirdrop = eligibleAmount - pool.totalAirdropClaimed;
-    log(`│  ├─ Unclaimed airdrop:  ${formatTokens(unclaimedAirdrop)} tokens`);
-  }
-  log(`│  └─ Staking rewards:    ${formatTokens(STAKING_POOL)} tokens (max)`);
   log("└─────────────────────────────────────────────────────────────────┘");
 
   log("\n" + "═".repeat(70));
