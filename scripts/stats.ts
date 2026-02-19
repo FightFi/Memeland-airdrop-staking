@@ -350,8 +350,8 @@ async function main() {
     staking: {
       activeStakers,
       unstaked: pool.totalUnstaked,
-      totalStaked: formatTokens(totalStakedVerified),
-      totalStakedRaw: totalStakedVerified.toString(),
+      totalStaked: formatTokens(pool.totalStaked),
+      totalStakedRaw: pool.totalStaked.toString(),
       rewardsPaid: formatTokens(rewardsPaid),
       rewardsPaidRaw: rewardsPaid.toString(),
       averageStake: activeStakers > 0 ? formatTokens(totalStakedVerified / BigInt(activeStakers)) : "0",
@@ -471,7 +471,7 @@ async function main() {
   log("\n┌─ STAKING ───────────────────────────────────────────────────────┐");
   log(`│  Active Stakers:   ${activeStakers.toLocaleString()}`);
   log(`│  Unstaked:         ${pool.totalUnstaked.toLocaleString()} users`);
-  log(`│  Total Staked:     ${formatTokens(totalStakedVerified)} tokens`);
+  log(`│  Total Staked:     ${formatTokens(pool.totalStaked)} tokens (67M - unstaked)`);
   if (activeStakers > 0) {
     log(`│  Average Stake:    ${formatTokens(totalStakedVerified / BigInt(activeStakers))} tokens`);
     log(`│  Largest Stake:    ${formatTokens(largestStake)} tokens`);
